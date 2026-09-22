@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TextQL Design Work Sample — VIP RSVP and Seating</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS  — pulled from the Figma system, plus Celtic accent
+   ============================================================ */
+:root{
+  /* neutrals */
+  --background:#ffffff;
+  --foreground:#0F172A;
+  --card:#ffffff;
+  --muted:#F1F5F9;
+  --muted-foreground:#64748B;
+  --secondary:#F1F5F9;
+  --secondary-foreground:#0F172A;
+  --border:#E2E8F0;
+  --ring:#94A3B8;
+  --canvas:#F8FAFC;
+
+  /* Celtic — primary + the AI accent */
+  --celtic-50:#F0F9F3;  --celtic-100:#DBF0E2; --celtic-200:#BAE0C9;
+  --celtic-300:#8CC9A8; --celtic-400:#5BAC83; --celtic-500:#3A8F67;
+  --celtic-600:#297251; --celtic-700:#215B42; --celtic-800:#1C4936;
+  --celtic-900:#153528; --celtic-950:#0C221A;
+  --primary:var(--celtic-700);
+  --primary-foreground:#ffffff;
+  --primary-hover:var(--celtic-800);
+
+  /* status */
+  --destructive:#EF4444;
+  --destructive-hover:#DC2626;
+  --slate-300:#CBD5E1;
+  --slate-400:#94A3B8;
+  --slate-700:#334155;
+  --destructive-subtle:#EF44441a;
+  --amber-50:#fffbeb; --amber-200:#fde68a; --amber-900:#78350f;
+
+  /* type — the system's named styles, nothing invented */
+  --font-sans:'Inter','Inter var',system-ui,-apple-system,sans-serif;
+  --font-mono:Menlo,Monaco,Consolas,'Courier New',monospace;
+  /* mono appears only where the content is literally code */
+
+  /* p-ui            Inter Regular   16/24 */
+  --t-ui:16px;            --lh-ui:24px;
+  /* body-medium     Inter Medium    14/24 */
+  --t-body:14px;          --lh-body:24px;
+  /* subtle          Inter Regular   14/20 */
+  --t-subtle:14px;        --lh-subtle:20px;
+  /* detail          Inter Medium    12/20 */
+  --t-detail:12px;        --lh-detail:20px;
+  /* small           Inter Medium    14/14 */
+  --t-small:14px;         --lh-small:14px;
+  /* inline code     Menlo  Bold     14/20 */
+  --t-code:14px;          --lh-code:20px;
+
+  --w-normal:400; --w-medium:500; --w-semibold:600; --w-bold:700;
+
+  /* space — 4px grid */
+  --s-1:4px;  --s-1-5:6px; --s-2:8px;  --s-2-5:10px; --s-3:12px;
+  --s-4:16px; --s-5:20px;  --s-6:24px; --s-8:32px;   --s-10:40px;
+  --s-12:48px; --s-14:56px;
+
+  /* control heights, taken from the system's components */
+  --h-compact:32px;   /* icon button, tab item, menu item */
+  --h-control:40px;   /* button, input, table row */
+  --h-nav:36px;       /* navigation menu item */
+  --h-chip:24px;      /* switch height, used for badges */
+
+  /* radius */
+  --r-sm:6px; --r-lg:10px; --r-xl:14px; --r-2xl:18px; --r-full:9999px;
+
+  /* elevation */
+  --shadow-xs:0 1px 2px #0000001a;
+  --shadow-md:0 4px 14px #14161a1f;
+  --shadow-lg:0 8px 28px #14161a29;
+  --ring-focus:0 0 0 3px #94A3B880;
+  --ring-primary:0 0 0 3px #3A8F6740;
+  --ring-destructive:0 0 0 3px #EF444433;
+
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--canvas);color:var(--foreground);font-family:var(--font-sans);
+  font-feature-settings:'cv11','ss01';font-variant-numeric:tabular-nums;
+  font-size:var(--t-subtle);line-height:var(--lh-subtle);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:none;box-shadow:var(--ring-focus)}
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* ============================================================
+   PRIMITIVES
+   ============================================================ */
+/* button */
+.btn,.srcbtn,.testbar button,.cin button,.proact button,.mf button{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--s-1-5);
+  height:var(--h-control);padding:0 var(--s-3);border-radius:var(--r-lg);
+  font-size:var(--t-subtle);font-weight:var(--w-medium);line-height:1;
+  border:1px solid transparent;background:var(--background);color:var(--secondary-foreground);
+  transition:background .14s var(--ease),border-color .14s var(--ease),box-shadow .14s var(--ease);
+  white-space:nowrap}
+.srcbtn,.testbar button,.cin button{height:var(--h-compact)}
+.srcbtn,.testbar button,.cin button,.proact button,.mf button{
+  border-color:var(--border);box-shadow:var(--shadow-xs)}
+.srcbtn:hover,.testbar button:hover,.cin button:hover,.proact button:hover,.mf button:hover{
+  background:var(--muted)}
+.proact .prim,.mf .prim{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+.proact .prim:hover,.mf .prim:hover{background:var(--primary-hover)}
+.mf .danger{background:var(--destructive);color:#fff;border-color:var(--destructive)}
+.mf .danger:hover{background:var(--destructive-hover);border-color:var(--destructive-hover)}
+
+/* input / select / textarea */
+.gsearch,.field input.ed,.field select.ed{
+  width:100%;height:var(--h-control);padding:0 var(--s-3);border:1px solid var(--border);
+  border-radius:var(--r-lg);background:var(--background);font-size:var(--t-subtle);
+  box-shadow:var(--shadow-xs);transition:border-color .14s var(--ease),box-shadow .14s var(--ease)}
+.field select.ed{padding-right:var(--s-6);appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted-foreground) 50%),linear-gradient(135deg,var(--muted-foreground) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 15px,calc(100% - 11px) 15px;background-size:4px 4px;background-repeat:no-repeat}
+.gsearch:focus,.cin input:focus,.field input.ed:focus,.field select.ed:focus{
+  outline:none;border-color:var(--ring);box-shadow:var(--ring-focus)}
+textarea.sql{width:100%;min-height:144px;font-family:var(--font-mono);font-size:var(--t-code);
+  line-height:var(--lh-code);padding:var(--s-2-5) var(--s-3);border:1px solid var(--border);
+  border-radius:var(--r-lg);background:var(--muted);resize:vertical;box-shadow:var(--shadow-xs)}
+textarea.sql:focus{outline:none;border-color:var(--ring);box-shadow:var(--ring-focus);background:var(--background)}
+
+/* badge */
+.chip{display:inline-flex;align-items:center;gap:var(--s-1);height:var(--h-chip);padding:0 var(--s-2);
+  border-radius:var(--r-full);border:1px solid var(--border);background:var(--background);
+  font-size:var(--t-detail);font-weight:var(--w-medium);color:var(--muted-foreground);white-space:nowrap}
+.chip.other{background:var(--secondary);border-color:transparent;color:var(--secondary-foreground)}
+.chip.live{background:var(--celtic-50);border-color:var(--celtic-200);color:var(--celtic-800)}
+.chip.pause{background:var(--amber-50);border-color:var(--amber-200);color:var(--amber-900)}
+
+/* card */
+.node,.gcard,.glist,.edit,.conn,.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--r-xl)}
+
+/* tabs */
+.tabs{display:flex;gap:var(--s-1);margin-top:var(--s-4)}
+.tabs button{height:var(--h-control);padding:0 var(--s-3);font-size:var(--t-subtle);
+  color:var(--muted-foreground);border-bottom:2px solid transparent;border-radius:var(--r-sm) var(--r-sm) 0 0}
+.tabs button:hover{color:var(--foreground)}
+.tabs button[aria-selected="true"]{color:var(--foreground);border-bottom-color:var(--primary);font-weight:var(--w-medium)}
+
+/* toggle group */
+.toggle{display:inline-flex;height:var(--h-control);padding:2px;gap:2px;background:var(--secondary);border-radius:var(--r-lg)}
+.toggle button{padding:0 var(--s-3);border-radius:calc(var(--r-lg) - 3px);font-size:var(--t-subtle);
+  font-weight:var(--w-medium);color:var(--muted-foreground);transition:background .14s var(--ease),color .14s var(--ease)}
+.toggle button:hover{color:var(--foreground)}
+.toggle button[aria-pressed="true"]{background:var(--background);color:var(--foreground);box-shadow:var(--shadow-xs)}
+.toggle.sub{height:var(--h-compact)}
+.toggle.sub button{padding:0 var(--s-2-5);font-size:var(--t-detail)}
+
+/* table */
+table.rows{width:100%;border-collapse:collapse;font-size:var(--t-subtle);line-height:var(--lh-subtle)}
+table.rows th{text-align:left;font-weight:var(--w-semibold);color:var(--slate-700);height:var(--h-compact);
+  padding:0 var(--s-2);border-bottom:1px solid var(--border);font-size:var(--t-detail)}
+table.rows td{height:var(--h-control);padding:0 var(--s-2);border-bottom:1px solid var(--muted);white-space:nowrap}
+table.rows tr:last-child td{border-bottom:none}
+tr.drop td{background:var(--destructive-subtle);color:#B91C1C}
+
+/* ============================================================
+   CHROME
+   ============================================================ */
+.topbar{display:flex;align-items:center;gap:var(--s-4);padding:0 var(--s-5);height:56px;flex:0 0 56px;
+  background:var(--background);border-bottom:1px solid var(--border)}
+.wfname{font-size:var(--t-ui);font-weight:var(--w-semibold);letter-spacing:-.011em}
+.meta{color:var(--muted-foreground);font-size:var(--t-detail);display:flex;gap:var(--s-3);align-items:center}
+.meta .dot{width:6px;height:6px;border-radius:50%;background:var(--celtic-500);display:inline-block;margin-right:var(--s-1-5);vertical-align:1px}
+.meta .ver{font-weight:var(--w-medium)}
+.meta .ver.bump{color:var(--celtic-600);font-weight:var(--w-medium)}
+.spacer{flex:1}
+.persona{display:inline-flex;align-items:center;gap:var(--s-1-5);height:var(--h-control);
+  font-size:var(--t-detail);color:var(--muted-foreground);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:0 var(--s-1-5) 0 var(--s-3);box-shadow:var(--shadow-xs);background:var(--background)}
+.persona select{border:none;background:none;font-size:var(--t-detail);color:var(--foreground);
+  font-weight:var(--w-medium);cursor:pointer;outline:none}
+.subbar{flex:0 0 44px;height:44px;background:var(--background);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:var(--s-4);padding:0 var(--s-5)}
+.subbar .note{font-size:var(--t-detail);color:var(--muted-foreground)}
+.canvaswrap{flex:1;position:relative;overflow:auto;background:var(--canvas)}
+.canvas{position:relative;min-height:100%;padding:var(--s-8) var(--s-10) 88px;transition:padding-left .22s var(--ease)}
+#wires{position:absolute;inset:0;pointer-events:none;overflow:visible}
+
+/* ============================================================
+   WORKFLOW NODE
+   ============================================================ */
+.node{position:relative;padding:var(--s-3);cursor:pointer;text-align:left;width:100%;display:block;
+  box-shadow:var(--shadow-xs);transition:border-color .14s var(--ease),box-shadow .14s var(--ease)}
+.node:hover{border-color:var(--slate-300);box-shadow:var(--shadow-md)}
+.node.sel{border-color:var(--primary);box-shadow:var(--ring-primary)}
+.node .nm{font-size:var(--t-subtle);font-weight:var(--w-medium);line-height:var(--lh-subtle);
+  padding-right:var(--s-2);min-height:var(--lh-subtle)}
+.node .badge{position:static;display:flex;gap:var(--s-1-5);align-items:center;
+  justify-content:flex-end;margin-bottom:var(--s-1-5);min-height:var(--h-chip)}
+.node .sysline{font-size:var(--t-detail);line-height:var(--lh-detail);color:var(--muted-foreground);
+  margin-top:var(--s-1);font-weight:var(--w-medium)}
+.node .ds{font-size:var(--t-detail);line-height:var(--lh-detail);color:var(--muted-foreground);
+  margin-top:var(--s-1);display:flex;gap:var(--s-1-5);align-items:baseline;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node .ds .ar{color:var(--slate-400)}
+.node .ds.out{color:var(--slate-700);font-weight:var(--w-medium)}
+.node .runline{display:flex;align-items:center;gap:var(--s-1-5);margin-top:var(--s-2);
+  padding-top:var(--s-2);border-top:1px solid var(--muted);
+  font-size:var(--t-detail);line-height:var(--lh-detail);color:var(--muted-foreground);
+  white-space:nowrap;overflow:hidden}
+.node .sdot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;background:var(--celtic-500)}
+.node .sdot.quiet{background:#D97706}
+.node .sdot.fail{background:var(--destructive)}
+.node .sdot.skip{background:var(--slate-300)}
+.node .spark{display:flex;gap:2px;margin-left:auto}
+.node .spark i{width:4px;height:12px;border-radius:1px;background:var(--celtic-500);display:block}
+.node .spark i.quiet{background:#D97706}
+.node .spark i.fail{background:var(--destructive)}
+.node .spark i.skip{background:var(--border)}
+
+.node .does{font-size:var(--t-detail);line-height:1.5;color:var(--muted-foreground);margin-top:var(--s-2)}
+.node .kindmark{display:inline-block;width:6px;height:6px;border-radius:2px;background:var(--slate-400);
+  margin-right:var(--s-2);vertical-align:1.5px}
+.node.agent .kindmark{border-radius:50%;background:transparent;box-shadow:inset 0 0 0 1.5px var(--slate-400)}
+.chip.decides{background:var(--background);border-color:var(--border);color:var(--muted-foreground)}
+.node.human{border-style:dashed}
+.node.folded{background:var(--secondary);border-style:dashed;border-color:var(--slate-300);box-shadow:none}
+.node.folded .nm{color:var(--muted-foreground);padding-right:var(--s-6)}
+.node.folded:hover{background:#E8EDF3}
+.node.folded .chev{float:right;color:var(--muted-foreground);font-size:var(--t-detail);transition:transform .18s var(--ease)}
+.node.folded.open .chev{transform:rotate(90deg)}
+
+.kebab{width:20px;height:20px;border-radius:var(--r-sm);color:var(--muted-foreground);
+  font-size:var(--t-ui);line-height:18px;text-align:center}
+.kebab:hover{color:var(--foreground);background:var(--secondary)}
+.ticks{display:flex;gap:var(--s-1)}
+.tick{width:16px;height:16px;border-radius:50%;border:1px solid var(--border);
+  display:grid;place-items:center;font-size:10px;line-height:1;color:#fff} /* glyph inside a 16px control, not a text style */
+.tick.ran{background:var(--celtic-600);border-color:var(--celtic-600)}
+.tick.open{background:transparent;border-style:dashed;border-color:var(--amber-900);opacity:.55}
+
+/* ops flow */
+.ops{max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+.joint{height:var(--s-6);display:flex;align-items:center;justify-content:center;position:relative}
+.joint::before{content:"";position:absolute;top:0;bottom:0;width:1px;background:var(--border)}
+.joint .plus{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--background);
+  color:var(--muted-foreground);font-size:var(--t-subtle);line-height:1;display:grid;place-items:center;
+  opacity:0;transition:opacity .13s var(--ease);position:relative;box-shadow:var(--shadow-xs)}
+.joint:hover .plus{opacity:1}
+.joint .plus:hover{border-color:var(--primary);color:var(--primary)}
+.nest{margin:var(--s-2) 0 var(--s-2) var(--s-5);padding-left:var(--s-4);
+  border-left:2px solid var(--border);display:flex;flex-direction:column;gap:var(--s-2)}
+.nest .node{background:var(--muted);box-shadow:none}
+.fencenote{font-size:var(--t-detail);color:var(--muted-foreground);padding:var(--s-1) 0 2px 2px}
+.chip.final{background:var(--destructive-subtle);border-color:#FCA5A5;color:#B91C1C}
+.testbar{max-width:480px;margin:var(--s-5) auto 0;display:flex;gap:var(--s-2)}
+.testout{max-width:480px;margin:var(--s-2) auto 0;font-size:var(--t-detail);
+  color:var(--celtic-700);display:none;background:var(--celtic-50);border:1px solid var(--celtic-200);
+  border-radius:var(--r-lg);padding:var(--s-2-5) var(--s-3);line-height:1.5}
+.testout.on{display:block}
+
+/* guests */
+.guests{max-width:680px;margin:0 auto}
+.glist{overflow:hidden;box-shadow:var(--shadow-xs)}
+.grow{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3) var(--s-4);
+  border-bottom:1px solid var(--muted);width:100%;text-align:left;transition:background .12s var(--ease)}
+.grow:last-child{border-bottom:none}
+.grow:hover{background:var(--muted)}
+.grow .st{width:8px;height:8px;border-radius:50%;flex:0 0 8px;background:var(--celtic-500)}
+.grow.stuck .st{background:#D97706}
+.grow.lost .st{background:var(--destructive)}
+.grow .whoc{flex:1}
+.grow .whoc b{font-weight:var(--w-medium);font-size:var(--t-subtle)}
+.grow .whoc span{display:block;font-size:var(--t-detail);color:var(--muted-foreground);margin-top:1px}
+.grow .where{font-size:var(--t-detail);color:var(--muted-foreground);text-align:right}
+.grow.lost .where{color:var(--destructive)}
+.ghead{display:flex;align-items:baseline;gap:var(--s-2-5);margin-bottom:var(--s-3)}
+.ghead h2{font-size:var(--t-ui);font-weight:var(--w-semibold);letter-spacing:-.011em}
+.ghead .c{font-size:var(--t-detail);color:var(--muted-foreground)}
+.gsearch{margin-bottom:var(--s-3)}
+.gback{font-size:var(--t-detail);color:var(--muted-foreground);margin-bottom:var(--s-3)}
+.gback:hover{color:var(--foreground)}
+.gcard{padding:var(--s-4) var(--s-5);margin-bottom:var(--s-4);box-shadow:var(--shadow-xs)}
+.gcard h2{font-size:var(--t-ui);font-weight:var(--w-semibold);letter-spacing:-.014em}
+.gcard .tags{font-size:var(--t-detail);color:var(--muted-foreground);margin-top:3px}
+.trail{display:flex;flex-direction:column}
+.tstep{display:flex;gap:var(--s-3);align-items:flex-start;cursor:pointer}
+.tstep .rail{display:flex;flex-direction:column;align-items:center;flex:0 0 14px}
+.tstep .pip{width:9px;height:9px;border-radius:50%;background:var(--celtic-500);margin-top:6px}
+.tstep .bar{flex:1;width:1px;background:var(--border);min-height:20px}
+.tstep.pending .pip{background:transparent;border:1px solid var(--slate-300)}
+.tstep.broke .pip{background:var(--destructive)}
+.tstep .txt{padding-bottom:var(--s-3);flex:1}
+.tstep .txt b{font-weight:var(--w-medium);font-size:var(--t-subtle);display:block}
+.tstep .txt span{font-size:var(--t-detail);color:var(--muted-foreground)}
+.tstep.pending .txt b,.tstep.pending .txt span{color:var(--slate-400)}
+.tstep.broke .txt b{color:var(--destructive)}
+.gcallout{border:1px solid #FCA5A5;background:var(--destructive-subtle);border-radius:var(--r-xl);
+  padding:var(--s-3) var(--s-4);font-size:var(--t-detail);color:#B91C1C;line-height:1.55;margin:var(--s-1) 0 var(--s-4)}
+.gcallout button{font-weight:var(--w-medium);margin-top:var(--s-2);display:block;color:#B91C1C;text-decoration:underline}
+
+/* data view */
+.data{display:flex;gap:96px;align-items:flex-start;padding-bottom:var(--s-5)}
+.col{display:flex;flex-direction:column;gap:var(--s-4);width:264px;flex:0 0 264px}
+.col.mid{margin-top:var(--s-10)}
+
+/* run grid */
+.gridwrap{flex:0 0 auto;background:var(--background);border-top:1px solid var(--border);max-height:214px;overflow:auto}
+.gridhead{display:flex;gap:var(--s-3);align-items:baseline;padding:var(--s-2-5) var(--s-5);
+  border-bottom:1px solid var(--muted);position:sticky;top:0;background:var(--background);z-index:2}
+.gridhead .t{font-size:var(--t-detail);font-weight:var(--w-semibold)}
+.gridhead .h{font-size:var(--t-detail);color:var(--muted-foreground)}
+table.grid{border-collapse:separate;border-spacing:2px;margin:var(--s-2) var(--s-5) var(--s-3)}
+table.grid th{font-weight:var(--w-normal);color:var(--muted-foreground);font-size:var(--t-detail);padding:0 0 var(--s-1);text-align:center}
+table.grid td.n{text-align:left;color:var(--muted-foreground);font-size:var(--t-detail);
+  padding-right:var(--s-3);white-space:nowrap}
+.cell{width:32px;height:16px;border-radius:3px;background:var(--celtic-500);display:block;cursor:pointer;
+  transition:transform .1s var(--ease)}
+.cell:hover{transform:scaleY(1.35)}
+.cell.fail{background:var(--destructive)}
+.cell.quiet{background:#D97706}
+.cell.skip{background:var(--border)}
+.legend{display:flex;gap:var(--s-4);font-size:var(--t-detail);color:var(--muted-foreground);padding:0 var(--s-5) var(--s-3)}
+.legend i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:var(--s-1-5);vertical-align:-1px}
+
+/* ============================================================
+   STEP PANEL
+   ============================================================ */
+.panel{position:fixed;top:56px;right:0;bottom:0;width:424px;background:var(--background);
+  border-left:1px solid var(--border);transform:translateX(100%);transition:transform .22s var(--ease);
+  display:flex;flex-direction:column;z-index:20;box-shadow:var(--shadow-lg)}
+.panel.on{transform:none}
+.phead{padding:var(--s-4) var(--s-5) 0;border-bottom:1px solid var(--muted)}
+.ptitle{display:flex;align-items:flex-start;gap:var(--s-2-5)}
+.ptitle h2{font-size:var(--t-ui);font-weight:var(--w-semibold);letter-spacing:-.011em;flex:1;line-height:var(--lh-ui)}
+.pclose{width:var(--h-compact);height:var(--h-compact);border-radius:var(--r-sm);color:var(--muted-foreground);font-size:var(--t-ui)}
+.pclose:hover{background:var(--secondary);color:var(--foreground)}
+.pkind{font-size:var(--t-detail);color:var(--muted-foreground);margin-top:3px}
+.ownerline{display:flex;align-items:center;gap:var(--s-2);margin-top:var(--s-2-5);flex-wrap:wrap}
+.owner{display:inline-flex;align-items:center;height:var(--h-chip);padding:0 var(--s-2);font-size:var(--t-detail);
+  font-weight:var(--w-medium);color:var(--secondary-foreground);background:var(--secondary);border-radius:var(--r-full)}
+.pbody{padding:var(--s-4) var(--s-5);overflow:auto;flex:1}
+.field{margin-bottom:var(--s-4)}
+.field .k{font-size:var(--t-detail);font-weight:var(--w-medium);color:var(--muted-foreground);margin-bottom:var(--s-1-5)}
+.field .v{font-size:var(--t-subtle)}
+.conn{display:flex;align-items:center;gap:var(--s-2-5);padding:var(--s-2-5) var(--s-3);background:var(--muted);box-shadow:none}
+.conn .cn{flex:1}
+.conn .cn b{font-size:var(--t-subtle);font-weight:var(--w-medium);display:block}
+.conn .cn span{font-size:var(--t-detail);color:var(--celtic-600)}
+.conn button{font-size:var(--t-detail);color:var(--muted-foreground);text-decoration:underline}
+.conn button:hover{color:var(--foreground)}
+.plain{background:var(--muted);border-radius:var(--r-lg);padding:var(--s-2-5) var(--s-3);
+  font-size:var(--t-detail);color:var(--muted-foreground);line-height:1.6;margin-bottom:var(--s-4)}
+.notmine{background:var(--amber-50);border:1px solid var(--amber-200);border-radius:var(--r-lg);
+  padding:var(--s-2-5) var(--s-3);font-size:var(--t-detail);color:var(--amber-900);line-height:1.6;margin-bottom:var(--s-4)}
+.sqlhint{font-size:var(--t-detail);color:var(--muted-foreground);margin-top:var(--s-1-5)}
+.arrowsnote{font-size:var(--t-detail);color:var(--celtic-600);font-weight:var(--w-medium);margin-top:var(--s-1-5);display:none}
+.arrowsnote.on{display:block}
+.railbox{border-left:2px solid var(--border);padding-left:var(--s-3);margin:var(--s-4) 0}
+.railbox h3{font-size:var(--t-detail);font-weight:var(--w-semibold);color:var(--muted-foreground);margin-bottom:var(--s-2)}
+.railbox ul{list-style:none;font-size:var(--t-detail);color:var(--muted-foreground);line-height:1.7}
+.railbox li::before{content:"·";margin-right:var(--s-2);color:var(--slate-400)}
+.callout{border:1px solid var(--celtic-200);background:var(--celtic-50);border-radius:var(--r-lg);
+  padding:var(--s-3);font-size:var(--t-detail);color:var(--celtic-900);line-height:1.6;margin-top:var(--s-2)}
+.callout button{font-weight:var(--w-medium);margin-top:var(--s-2);display:block;color:var(--celtic-700);text-decoration:underline}
+.appmark{display:inline-flex;align-items:center;justify-content:center;border-radius:var(--r-sm);
+  flex:0 0 auto;vertical-align:-3px}
+.appmark.blank{background:var(--muted);border:1px solid var(--border)}
+.node .sysline{display:flex;align-items:center;gap:var(--s-1-5)}
+.node .sysline>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conn .appmark{margin-right:var(--s-1)}
+.tstep .txt .tsys{display:flex;align-items:center;gap:var(--s-1-5)}
+.picker button .appmark{margin-top:1px}
+.grouphead{font-size:var(--t-detail);font-weight:var(--w-semibold);color:var(--muted-foreground);
+  text-transform:uppercase;letter-spacing:.04em;margin:var(--s-5) 0 var(--s-2);
+  padding-top:var(--s-3);border-top:1px solid var(--muted)}
+textarea.ed.area{width:100%;padding:var(--s-2) var(--s-3);border:1px solid var(--border);
+  border-radius:var(--r-lg);background:var(--background);font-size:var(--t-subtle);
+  line-height:var(--lh-subtle);resize:vertical;box-shadow:var(--shadow-xs);min-height:92px;height:auto}
+textarea.ed.area:focus{outline:none;border-color:var(--ring);box-shadow:var(--ring-focus)}
+input.ed.mapped{font-family:var(--font-mono);font-size:var(--t-detail)}
+.vars{display:none;flex-wrap:wrap;gap:var(--s-1);margin-top:var(--s-1-5)}
+.vars.on{display:flex}
+.vchip{font-family:var(--font-mono);font-size:11px;border:1px solid var(--celtic-200);
+  background:var(--celtic-50);color:var(--celtic-800);border-radius:var(--r-sm);padding:2px var(--s-1-5)}
+.vchip:hover{background:var(--celtic-100);border-color:var(--celtic-400)}
+.verlist{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--s-3)}
+.verrow{padding:var(--s-2-5) var(--s-3);border-bottom:1px solid var(--muted);position:relative}
+.verrow:last-child{border-bottom:none}
+.verrow.current{background:var(--celtic-50)}
+.vhead{display:flex;align-items:baseline;gap:var(--s-2);font-size:var(--t-detail);line-height:var(--lh-detail)}
+.vnum{font-weight:var(--w-semibold)}
+.vwho{color:var(--muted-foreground)}
+.vat{color:var(--slate-400);margin-left:auto}
+.vwhat{font-size:var(--t-detail);line-height:var(--lh-detail);margin-top:var(--s-1);color:var(--foreground)}
+.vdiff{margin-top:var(--s-1);display:flex;gap:var(--s-1-5);align-items:baseline;flex-wrap:wrap}
+.vdiff .was{color:var(--slate-400);text-decoration:line-through}
+.vdiff .ar{color:var(--slate-400)}
+.vdiff .now{font-weight:var(--w-medium)}
+.vrev{margin-top:var(--s-2);font-size:var(--t-detail);color:var(--muted-foreground);text-decoration:underline}
+.vrev:hover{color:var(--foreground)}
+.tasklist{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:var(--s-3)}
+.taskrow{display:flex;align-items:center;gap:var(--s-2-5);width:100%;text-align:left;
+  padding:var(--s-2-5) var(--s-3);border-bottom:1px solid var(--muted);background:var(--background);
+  font-size:var(--t-detail);line-height:var(--lh-detail)}
+.taskrow:hover{background:var(--muted)}
+.taskrow.open{background:var(--muted)}
+.tdot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;background:var(--celtic-500)}
+.tdot.hold{background:#D97706}.tdot.fail{background:var(--destructive)}.tdot.skip{background:var(--slate-300)}
+.tname{font-weight:var(--w-medium);flex:0 0 96px}
+.tdetail{flex:1;color:var(--muted-foreground)}
+.ttime{color:var(--slate-400)}
+.taskbody{padding:var(--s-2) var(--s-3) var(--s-3);background:var(--muted);border-bottom:1px solid var(--border)}
+.missing{border:1px solid #FCA5A5;background:var(--destructive-subtle);
+  border-radius:var(--r-lg);padding:var(--s-3);margin-bottom:var(--s-3)}
+.missing .mh{display:flex;align-items:center;gap:var(--s-2);font-size:var(--t-detail);
+  font-weight:var(--w-semibold);color:#B91C1C;margin-bottom:var(--s-2)}
+.missing .mdot{width:7px;height:7px;border-radius:50%;background:var(--destructive);flex:0 0 7px}
+.missing .mrows{border-top:1px solid #FCA5A5;border-bottom:1px solid #FCA5A5;padding:var(--s-1) 0}
+.missing .mrow{display:flex;justify-content:space-between;gap:var(--s-2);
+  font-size:var(--t-detail);line-height:22px;color:#B91C1C}
+.missing .mrow .me{font-family:var(--font-mono);opacity:.75}
+.missing .mwhy{font-size:var(--t-detail);color:#B91C1C;margin-top:var(--s-2);line-height:1.5}
+.missing .mbtn{margin-top:var(--s-2);font-size:var(--t-detail);font-weight:var(--w-medium);
+  color:#B91C1C;text-decoration:underline}
+.taskfoot{font-size:var(--t-detail);color:var(--muted-foreground);margin-bottom:var(--s-3)}
+.adv{margin-top:var(--s-2)}
+.adv summary{font-size:var(--t-detail);font-weight:var(--w-medium);color:var(--muted-foreground);
+  cursor:pointer;padding:var(--s-2) 0;list-style:none}
+.adv summary::-webkit-details-marker{display:none}
+.adv summary::before{content:'\203a ';display:inline-block;transition:transform .16s var(--ease)}
+.adv[open] summary::before{transform:rotate(90deg)}
+.adv summary:hover{color:var(--foreground)}
+.runpick{display:flex;gap:var(--s-1);margin-bottom:var(--s-4);flex-wrap:wrap}
+.runpick button{display:flex;flex-direction:column;align-items:center;gap:var(--s-1);
+  padding:var(--s-1-5) var(--s-2);border:1px solid var(--border);border-radius:var(--r-lg);
+  background:var(--background);font-size:var(--t-detail);color:var(--muted-foreground);min-width:52px}
+.runpick button .bar{width:100%;height:4px;border-radius:2px;background:var(--celtic-500)}
+.runpick button .bar.quiet{background:#D97706}
+.runpick button .bar.fail{background:var(--destructive)}
+.runpick button .bar.skip{background:var(--border)}
+.runpick button[aria-pressed="true"]{border-color:var(--foreground);color:var(--foreground);
+  font-weight:var(--w-medium);box-shadow:var(--shadow-xs)}
+.kv{display:flex;border-bottom:1px solid var(--muted);padding:var(--s-2) 0;
+  font-size:var(--t-detail);line-height:var(--lh-detail);gap:var(--s-3)}
+.kv:last-child{border-bottom:none}
+.kv .kk{width:132px;flex:0 0 132px;color:var(--muted-foreground)}
+.kv .vv{flex:1;color:var(--foreground);word-break:break-word}
+.kv .vv.mono{font-family:var(--font-mono)}
+.state{display:inline-flex;align-items:center;gap:var(--s-1-5);height:var(--h-chip);
+  padding:0 var(--s-2);border-radius:var(--r-sm);font-size:var(--t-detail);font-weight:var(--w-medium)}
+.state.ok{background:var(--celtic-100);color:var(--celtic-800)}
+.state.quiet{background:var(--amber-50);color:var(--amber-900);border:1px solid var(--amber-200)}
+.state.fail{background:var(--destructive-subtle);color:#B91C1C}
+.state.skip{background:var(--muted);color:var(--muted-foreground)}
+.runacts{display:flex;gap:var(--s-2);margin-top:var(--s-4);flex-wrap:wrap}
+.runacts button{height:var(--h-compact);padding:0 var(--s-3);border:1px solid var(--border);
+  border-radius:var(--r-lg);font-size:var(--t-detail);font-weight:var(--w-medium);
+  background:var(--background);box-shadow:var(--shadow-xs);color:var(--secondary-foreground)}
+.runacts button:hover{background:var(--muted)}
+.schema{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-top:var(--s-1-5)}
+.schema .sr{display:flex;gap:var(--s-3);padding:var(--s-1-5) var(--s-2-5);border-bottom:1px solid var(--muted);
+  font-size:var(--t-detail);line-height:var(--lh-detail)}
+.schema .sr:last-child{border-bottom:none}
+.schema .sr .cn{flex:1;font-family:var(--font-mono);color:var(--foreground)}
+.schema .sr .ct{color:var(--muted-foreground)}
+.schema .sr .cnull{color:var(--muted-foreground);width:62px;text-align:right}
+.psrc{border-top:1px solid var(--muted);padding:var(--s-3) var(--s-5);display:flex;gap:var(--s-4)}
+.psrc button{font-size:var(--t-detail);color:var(--muted-foreground);text-decoration:underline}
+.psrc button:hover{color:var(--foreground)}
+.psrc .del{color:var(--destructive)}
+
+/* menu */
+.menu{position:fixed;background:var(--background);border:1px solid var(--border);border-radius:var(--r-xl);
+  box-shadow:var(--shadow-lg);padding:var(--s-1);z-index:60;min-width:212px;display:none}
+.menu.on{display:block}
+.menu button{display:flex;align-items:center;width:100%;text-align:left;height:var(--h-compact);
+  padding:0 var(--s-2-5);font-size:var(--t-subtle);font-weight:var(--w-medium);border-radius:var(--r-sm)}
+.menu button:hover{background:var(--secondary)}
+.menu .dv{height:1px;background:var(--muted);margin:var(--s-1) 0}
+.menu .cap{font-size:var(--t-detail);font-weight:var(--w-medium);color:var(--muted-foreground);padding:var(--s-1-5) var(--s-2-5) var(--s-1)}
+.picker{padding:2px}
+.picker button{display:flex;gap:var(--s-2-5);width:100%;text-align:left;padding:var(--s-2) var(--s-2-5);
+  border-radius:var(--r-lg);align-items:flex-start}
+.picker .ic{width:7px;height:7px;border-radius:2px;background:var(--slate-400);margin-top:6px;flex:0 0 7px}
+.picker .ic.ai{background:transparent;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--slate-400)}
+.picker b{font-weight:var(--w-medium);font-size:var(--t-subtle);display:block}
+.picker span{font-size:var(--t-detail);color:var(--muted-foreground);line-height:1.45}
+
+/* dialog */
+.scrim{position:fixed;inset:0;background:#0F172A52;display:none;place-items:center;z-index:70}
+.scrim.on{display:grid}
+.modal{width:468px;max-width:92vw;overflow:hidden;box-shadow:var(--shadow-lg);border-radius:var(--r-2xl)}
+.modal h3{font-size:var(--t-ui);font-weight:var(--w-semibold);padding:var(--s-5) var(--s-6) 0;letter-spacing:-.011em}
+.modal .mb{padding:var(--s-2-5) var(--s-6) var(--s-5);font-size:var(--t-subtle);color:var(--muted-foreground);line-height:1.6}
+.modal .impact{border:1px solid var(--border);border-radius:var(--r-lg);margin-top:var(--s-3)}
+.modal .impact .ih{font-size:var(--t-detail);font-weight:var(--w-medium);color:var(--muted-foreground);
+  padding:var(--s-2) var(--s-3);border-bottom:1px solid var(--muted)}
+.modal .impact ul{list-style:none;padding:var(--s-2) var(--s-3);font-size:var(--t-detail);color:var(--foreground);line-height:1.8}
+.modal .impact li::before{content:"→";color:var(--muted-foreground);margin-right:var(--s-2)}
+.modal .mf{display:flex;justify-content:flex-end;gap:var(--s-2);padding:var(--s-3) var(--s-6);
+  border-top:1px solid var(--muted);background:var(--muted)}
+
+/* code drawer */
+.drawer{position:fixed;inset:56px 0 0 0;background:#0F172A47;opacity:0;pointer-events:none;
+  transition:opacity .2s var(--ease);z-index:40}
+.drawer.on{opacity:1;pointer-events:auto}
+.dpanel{position:absolute;right:0;top:0;bottom:0;width:580px;max-width:92vw;background:var(--celtic-950);
+  transform:translateX(100%);transition:transform .24s var(--ease);display:flex;flex-direction:column}
+.drawer.on .dpanel{transform:none}
+.dhead{display:flex;align-items:center;gap:var(--s-3);padding:var(--s-3) var(--s-5);
+  border-bottom:1px solid #ffffff1a;color:#e8f0eb}
+.dhead .t{font-size:var(--t-subtle);font-weight:var(--w-medium);flex:1}
+.dhead .scope{font-size:var(--t-detail);color:#8fae9d}
+.dhead button{width:var(--h-compact);height:var(--h-compact);border-radius:var(--r-sm);color:#8fae9d;font-size:var(--t-ui)}
+.dhead button:hover{background:#ffffff14;color:#fff}
+.dcode{flex:1;overflow:auto;padding:var(--s-4) var(--s-5);font-family:var(--font-mono);
+  font-size:var(--t-code);line-height:var(--lh-code);color:#c3d6cb;white-space:pre}
+.dcode .key{color:#8CC9A8}.dcode .str{color:#DBF0E2}.dcode .num{color:#F6D751}
+.dfoot{padding:var(--s-3) var(--s-5);border-top:1px solid #ffffff1a;color:#8fae9d;font-size:var(--t-detail)}
+
+/* toast */
+.tip{position:fixed;z-index:120;max-width:264px;background:var(--foreground);color:#fff;
+  font-size:var(--t-detail);line-height:var(--lh-detail);font-weight:var(--w-normal);
+  padding:var(--s-1-5) var(--s-2-5);border-radius:var(--r-sm);box-shadow:var(--shadow-lg);
+  opacity:0;pointer-events:none;transition:opacity .12s var(--ease);transform:translateY(2px)}
+.tip.on{opacity:1;transform:none}
+.tip b{font-weight:var(--w-semibold)}
+[data-tip]{cursor:default}
+button[data-tip],.cell[data-tip],.node [data-tip]{cursor:inherit}
+.toast{position:fixed;bottom:var(--s-6);left:50%;transform:translateX(-50%) translateY(14px);
+  background:var(--foreground);color:#fff;font-size:var(--t-detail);padding:var(--s-2-5) var(--s-4);
+  border-radius:var(--r-lg);opacity:0;pointer-events:none;box-shadow:var(--shadow-lg);
+  transition:opacity .2s var(--ease),transform .2s var(--ease);z-index:80;max-width:460px;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+/* ============================================================
+   ASK ANA
+   ============================================================ */
+.fab{position:fixed;right:var(--s-6);bottom:var(--s-6);z-index:35;display:flex;align-items:center;
+  gap:var(--s-2);height:44px;background:var(--primary);color:var(--primary-foreground);
+  border-radius:var(--r-full);padding:0 var(--s-5) 0 var(--s-4);box-shadow:var(--shadow-lg);
+  font-size:var(--t-subtle);font-weight:var(--w-medium);
+  transition:right .22s var(--ease),background .14s var(--ease),transform .14s var(--ease)}
+.fab:hover{background:var(--primary-hover);transform:translateY(-1px)}
+.fab:active{transform:none}
+.fab .orb{width:16px;height:16px;border-radius:50%;flex:0 0 16px;
+  background:radial-gradient(circle at 32% 28%,var(--celtic-200),var(--celtic-400) 58%,var(--celtic-600))}
+.fab .kbd{font-weight:var(--w-medium);font-size:var(--t-detail);opacity:.6;
+  border:1px solid #ffffff3d;border-radius:var(--r-sm);padding:1px var(--s-1);margin-left:2px}
+body.panelopen .fab{right:calc(424px + var(--s-6))}
+body.chatopen .fab{background:var(--background);color:var(--muted-foreground);
+  border:1px solid var(--border);box-shadow:var(--shadow-md)}
+body.chatopen .fab .kbd{border-color:var(--border);opacity:.8}
+@media (max-width:900px){.fab .lbl,.fab .kbd{display:none}.fab{width:44px;padding:0;justify-content:center}}
+
+.chat{position:fixed;left:0;top:100px;bottom:0;width:404px;background:var(--background);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:18;
+  transform:translateX(-100%);transition:transform .22s var(--ease);box-shadow:var(--shadow-lg)}
+.chat.on{transform:none}
+body.chatopen .canvas{padding-left:calc(404px + var(--s-10))}
+.chead{display:flex;align-items:center;gap:var(--s-2-5);padding:var(--s-3) var(--s-4);border-bottom:1px solid var(--muted)}
+.chead .sp{width:9px;height:9px;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,var(--celtic-200),var(--celtic-400) 58%,var(--celtic-600))}
+.chead .t{font-size:var(--t-subtle);font-weight:var(--w-semibold);flex:1}
+.chead .nw{font-size:var(--t-detail);color:var(--muted-foreground);text-decoration:underline}
+.chead .nw:hover{color:var(--foreground)}
+.chead .x{width:var(--h-compact);height:var(--h-compact);border-radius:var(--r-sm);color:var(--muted-foreground);font-size:var(--t-ui)}
+.chead .x:hover{background:var(--secondary);color:var(--foreground)}
+.clog{flex:1;overflow:auto;padding:var(--s-4)}
+.msg{margin-bottom:var(--s-4)}
+.msg.you{display:flex;justify-content:flex-end}
+.msg.you span{background:var(--celtic-50);border:1px solid var(--celtic-100);color:var(--celtic-900);
+  border-radius:var(--r-xl) var(--r-xl) var(--r-sm) var(--r-xl);padding:var(--s-2) var(--s-3);
+  font-size:var(--t-subtle);max-width:85%;line-height:1.5}
+.msg.bot .worked{font-size:var(--t-detail);color:var(--muted-foreground);margin-bottom:var(--s-2);
+  cursor:pointer;display:inline-block}
+.msg.bot .worked:hover{color:var(--foreground)}
+.msg.bot .worked .cv{display:inline-block;transition:transform .16s var(--ease)}
+.msg.bot .worked.open .cv{transform:rotate(90deg)}
+.looked{display:none;border-left:2px solid var(--celtic-200);padding:2px 0 2px var(--s-3);margin:0 0 var(--s-3) 2px}
+.looked.on{display:block}
+.looked div{font-size:var(--t-detail);color:var(--muted-foreground);line-height:1.8}
+.looked div::before{content:"✓";color:var(--celtic-500);margin-right:var(--s-2)}
+.msg.bot .say{font-size:var(--t-subtle);color:var(--foreground);line-height:1.6}
+.msg.bot .say b{font-weight:var(--w-medium)}
+.msg.bot .say .q{display:block;margin-top:var(--s-3);font-weight:var(--w-medium)}
+.msg.bot .say .why{display:block;margin-top:var(--s-1);font-size:var(--t-detail);color:var(--muted-foreground)}
+.opts2{display:flex;flex-direction:column;gap:var(--s-1-5);margin-top:var(--s-3)}
+.opts2 button{text-align:left;font-size:var(--t-detail);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:var(--s-2) var(--s-3);background:var(--background);line-height:1.45;box-shadow:var(--shadow-xs);
+  transition:border-color .14s var(--ease),background .14s var(--ease)}
+.opts2 button:hover{border-color:var(--celtic-400);background:var(--celtic-50)}
+.cfoot{border-top:1px solid var(--muted);padding:var(--s-3) var(--s-4)}
+.cin{display:flex;gap:var(--s-2);align-items:center}
+.cin input{flex:1;height:var(--h-control);padding:0 var(--s-3);border:1px solid var(--border);
+  border-radius:var(--r-lg);background:var(--background);font-size:var(--t-subtle);box-shadow:var(--shadow-xs)}
+.starters{display:flex;flex-direction:column;gap:var(--s-1-5);margin-bottom:var(--s-2-5)}
+.starters button{text-align:left;font-size:var(--t-detail);color:var(--muted-foreground);
+  border:1px solid var(--border);background:var(--background);border-radius:var(--r-lg);
+  padding:var(--s-1-5) var(--s-2-5);line-height:1.4}
+.starters button:hover{border-color:var(--celtic-400);color:var(--celtic-800);background:var(--celtic-50)}
+
+/* proposal diff */
+.proposal{padding:0;display:block}
+.prosaid{font-size:var(--t-subtle);color:var(--foreground);line-height:1.6;margin-bottom:var(--s-3)}
+.prosaid b{font-weight:var(--w-medium)}
+.edit{margin-bottom:var(--s-2);overflow:hidden;box-shadow:var(--shadow-xs)}
+.edit .eh{display:flex;align-items:center;gap:var(--s-2);padding:var(--s-2) var(--s-3);
+  background:var(--muted);border-bottom:1px solid var(--border)}
+.edit .tag{font-size:var(--t-detail);letter-spacing:.04em;text-transform:uppercase;border-radius:var(--r-sm);
+  padding:1px var(--s-1-5);font-weight:var(--w-semibold)}
+.tag.add{background:var(--celtic-100);color:var(--celtic-800)}
+.tag.chg{background:#DBEAFE;color:#1D4ED8}
+.tag.rm{background:var(--destructive-subtle);color:#B91C1C}
+.edit .eh .en{font-size:var(--t-detail);font-weight:var(--w-medium);flex:1}
+.edit .eh .eo{font-size:var(--t-detail);color:var(--muted-foreground)}
+.edit .eb{padding:var(--s-2-5) var(--s-3);font-size:var(--t-detail);color:var(--muted-foreground);line-height:1.6}
+.edit .eb .was{color:var(--slate-400);text-decoration:line-through}
+.edit .eb code{font-family:var(--font-mono);font-weight:var(--w-bold);font-size:var(--t-code);
+  line-height:var(--lh-code);background:var(--muted);border-radius:var(--r-sm);
+  padding:1px var(--s-1-5);color:var(--foreground)}
+.edit .eb pre{font-family:var(--font-mono);font-size:var(--t-code);line-height:var(--lh-code);background:var(--muted);
+  border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--s-2) var(--s-2-5);
+  white-space:pre-wrap;margin-top:var(--s-1-5);color:var(--foreground);line-height:1.6}
+.edit .eb pre .ins{background:var(--celtic-100);color:var(--celtic-900)}
+.affect{font-size:var(--t-detail);color:var(--muted-foreground);margin:var(--s-2-5) 0 var(--s-3);line-height:1.6}
+.proact{display:flex;gap:var(--s-2);justify-content:flex-end}
+.clarify{background:var(--amber-50);border:1px solid var(--amber-200);border-radius:var(--r-xl);
+  padding:var(--s-3);font-size:var(--t-detail);color:var(--amber-900);line-height:1.6}
+.clarify .opts{display:flex;gap:var(--s-1-5);margin-top:var(--s-2-5);flex-wrap:wrap}
+.clarify .opts button{font-size:var(--t-detail);border:1px solid #e6cfa0;background:var(--background);
+  border-radius:var(--r-lg);padding:var(--s-1-5) var(--s-2-5);color:var(--amber-900)}
+.clarify .opts button:hover{background:#fff8ec}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="wfname">VIP RSVP and Seating</div>
+    <div class="meta"><span class="ver" id="ver">v7</span></div>
+    <div class="spacer"></div>
+
+    <div class="toggle" role="group"><button id="tOps" aria-pressed="true">Ops</button><button id="tData" aria-pressed="false">Data</button></div>
+    <button class="srcbtn" id="srcAll">View source</button>
+  </div>
+  <div class="subbar">
+    <div class="note" id="viewnote"></div>
+  </div>
+  <div class="canvaswrap"><div class="canvas" id="canvas"><svg id="wires"></svg><div id="stage"></div></div></div>
+
+  <aside class="chat" id="chat">
+    <div class="chead"><span class="sp"></span><span class="t">Ana</span>
+      <button class="nw" id="chatNew">New</button><button class="x" id="chatX">&times;</button></div>
+    <div class="clog" id="clog"></div>
+    <div class="cfoot">
+      <div class="starters" id="starters"></div>
+      <div class="cin"><input id="askIn" placeholder="Describe a change"><button id="askGo">Send</button></div>
+    </div>
+  </aside>
+  <div class="gridwrap" id="gridwrap">
+    <div class="gridhead"><span class="t">Run history</span><span class="h">Each column is one run, each row is one step.</span></div>
+    <div id="gridbody"></div>
+    <div class="legend"><span><i style="background:#3A8F67"></i>Success</span><span><i style="background:#D97706"></i>Rows quarantined</span><span><i style="background:#EF4444"></i>Failed</span><span><i style="background:#E2E8F0"></i>Skipped</span></div>
+  </div>
+</div>
+
+<aside class="panel" id="panel">
+  <div class="phead"><div class="ptitle"><div style="flex:1"><h2 id="pTitle">Step</h2><div class="pkind" id="pKind"></div><div class="ownerline" id="pOwner"></div></div><button class="pclose" id="pClose">&times;</button></div>
+  <div class="tabs"><button id="tabCfg" aria-selected="true">Configure</button><button id="tabData" aria-selected="false">Data</button><button id="tabRun" aria-selected="false">History</button><button id="tabVer" aria-selected="false">Versions</button></div></div>
+  <div class="pbody" id="pBody"></div>
+  <div class="psrc"><button id="pSrc">View source for this step</button><button class="del" id="pDel">Delete</button></div>
+</aside>
+
+<div class="menu" id="menu"></div>
+<div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<div class="tip" id="tip" role="tooltip"></div>
+<button class="fab" id="chatOpen" aria-expanded="false" aria-controls="chat">
+  <span class="orb"></span><span class="lbl">Ask Ana</span><span class="kbd">⌘K</span>
+</button>
+<div class="drawer" id="drawer"><div class="dpanel">
+  <div class="dhead"><div class="t">Source</div><div class="scope" id="dScope"></div><button id="dClose">&times;</button></div>
+  <pre class="dcode" id="dCode"></pre><div class="dfoot" id="dfoot"></div></div></div>
+
+<script>
+/* ================= ONE OBJECT — 10 steps ================= */
+let VERSION=7;
+const STEPS=[
+ {id:'rsvps',dsOut:'rsvps',count:'812 rows',dur:'2.4s',history:['ok','ok','ok','ok','ok','ok'],name:'Pull RSVP responses',scope:'batch',kind:'source',produces:'rsvps',
+  system:'Launchmetrics',mode:'batch',sub:'812 rows · pulled 2:00pm',
+  does:'Copies RSVPs that changed since the last run.',
+  conn:{id:'launchmetrics',name:'Launchmetrics',acct:'nyfw-agency · connected'},action:'read',
+  values:{table:'event_rsvps',sync:'Incremental',retries:'3',backoff:'Exponential'},
+  cols:['email','show_id','status'],rows:[['anna@gmail.com','6pm','confirmed'],['leo@wsj.com','6pm','confirmed'],['m.osei@elle.fr','8pm','confirmed']]},
+
+ {id:'profiles',dsOut:'profiles',count:'1,940 rows',dur:'3.1s',history:['ok','ok','ok','fail','ok','ok'],name:'Pull guest profiles',scope:'batch',kind:'source',produces:'profiles',
+  system:'Launchmetrics',mode:'batch',sub:'1,940 rows · pulled 2:00pm',
+  does:'Copies the guest profiles: tier, affiliation, dietary and access notes.',
+  conn:{id:'launchmetrics',name:'Launchmetrics',acct:'nyfw-agency · connected'},action:'read',
+  values:{table:'pr_contacts',sync:'Full refresh',retries:'3',backoff:'Exponential'},
+  cols:['email','full_name','tier'],rows:[['anna@vogue.com','Anna Chen','tier_1'],['leo@wsj.com','Leo Park','press'],['m.osei@elle.fr','Mira Osei','tier_1']]},
+
+ {id:'join',dsIn:'rsvps + profiles',dsOut:'guest_table',count:'809 of 812 rows',dur:'4.1s',history:['ok','ok','ok','skip','quiet','quiet'],name:'Clean, join and save the guest list',scope:'batch',kind:'transform',produces:'guest_table',
+  system:'Snowflake',mode:'batch',sub:'809 matched · 3 dropped',
+  does:'Matches RSVPs to profiles and saves one row per guest.',
+  conn:{id:'snowflake',name:'Snowflake',acct:'fashion_week · connected'},
+  sql:`select\n  p.guest_id,\n  p.full_name,\n  p.tier,\n  r.show_id,\n  r.status\nfrom rsvps r\nleft join profiles p on lower(r.email) = lower(p.email)`,
+  action:'query',values:{target:'warehouse.guest_table',write:'Merge',unmatched:'Quarantine',retries:'1'},
+  cols:['guest_id','full_name','tier','show_id'],rows:[['g_204','Leo Park','press','6pm'],['g_118','Mira Osei','tier_1','8pm'],['g_077','Tomas Okafor','vip','6pm']]},
+
+ {id:'fanout',dsIn:'guest_table',dsOut:'one guest record',count:'12 guests',dur:'0.3s',history:['ok','ok','ok','skip','ok','ok'],name:'For each new confirmed VIP',scope:'seam',kind:'fan out',produces:'guest',
+  system:'Snowflake',mode:'batch',sub:'12 guests this run',
+  does:'Starts the steps below once per guest.',
+  conn:{id:'snowflake',name:'Snowflake',acct:'fashion_week · connected'},
+  sql:`select * from guest_table\nwhere tier in ('vip','tier_1')\n  and status = 'confirmed'\n  and first_seen_run = {{ run.id }}`,
+  action:'select',values:{concurrency:'5',dedupe:'guest_id + show_id'},
+  cols:['guest_id','full_name','tier'],rows:[['g_118','Mira Osei','tier_1'],['g_077','Tomas Okafor','vip']]},
+
+ {id:'assign',dsIn:'one guest record',dsOut:'show + seat',count:'12 of 12',dur:'1.2s',history:['ok','ok','ok','skip','ok','ok'],name:'Assign show and seat',scope:'record',kind:'decision',agent:true,
+  system:'Venue ops system',mode:'live',sub:'live capacity',
+  decision:'6pm · B12 — attended this designer three seasons running',conf:'0.91',
+  does:'Picks a show and seat based on who else is seated.',
+  conn:{id:'venue',name:'Venue ops system',acct:'spring-studios · connected'},
+  action:'decide',values:{prompt:'Choose a show and seat for this guest. Weigh their tier, past attendance, designer relationships and who they will be seated beside. Never choose a show without remaining capacity, and never a held seat block.',tools:'Live capacity and guest history',contract:'show, seat, confidence, reasoning',threshold:'0.80',escalate:'Tier 1',model:'claude-sonnet-4-6',onerror:'Send to review'},
+  cols:['guest','show','seat','sure'],rows:[['Leo Park','6pm','B12','0.91'],['Mira Osei','8pm','C04','0.62']]},
+
+ {id:'reserve',dsIn:'show + seat',dsOut:'confirmation code',count:'11 of 12',dur:'0.9s',history:['ok','ok','ok','skip','ok','ok'],name:'Reserve the seat',scope:'record',kind:'action',
+  system:'Launchmetrics',mode:'write',sub:'writes to the seating chart',
+  does:'Books the seat. Without this it is only a suggestion.',
+  conn:{name:'Launchmetrics',acct:'nyfw-agency · connected'},
+  action:'write',values:{op:'Assign seat',m_guest:'{{guest.guest_id}}',m_show:'{{assign.show}}',m_seat:'{{assign.seat}}',retries:'3',backoff:'Exponential',onerror:'Send to review'},
+  cols:['guest','seat','result'],rows:[['Leo Park','B12','assigned'],['Tomas Okafor','A03','assigned']]},
+
+ {id:'approve',dsIn:'show + seat',dsOut:'approved seat',count:'1 waiting',dur:'—',history:['ok','ok','ok','skip','ok','ok'],name:'Seating lead approval',scope:'record',kind:'human step',human:true,
+  system:'Slack',mode:'pause',sub:'tier 1, or low confidence',
+  does:'Waits for a person to accept or change the seat.',
+  conn:{id:'slack',name:'Slack',acct:'fashionweek-ops · connected'},
+  action:'ask',values:{assignee:'Seating lead',body:'{{guest.full_name}} ({{guest.tier}}) \u2192 {{assign.show}}, seat {{assign.seat}}.\n\nWhy: {{assign.reasoning}}',buttons:'Approve, Change seat',timeout:'2 hours',ontimeout:'Escalate'},
+  cols:['guest','why','state'],rows:[['Mira Osei','tier 1','waiting 48m'],['Leo Park','—','skipped']]},
+
+ {id:'notify',dsIn:'approved seat',dsOut:'—',count:'11 sent',dur:'0.4s',history:['ok','ok','ok','skip','ok','ok'],name:'Notify the seating team',scope:'record',kind:'action',
+  system:'Slack',mode:'write',sub:'#seating-ops',
+  does:'Posts the guest and seat to a channel.',
+  conn:{id:'slack',name:'Slack',acct:'fashionweek-ops · connected'},
+  action:'post',values:{channel:'#seating-ops',body:'{{guest.full_name}} is seated \u2014 {{assign.show}}, seat {{assign.seat}}. Confirmation {{reserve.confirmation_code}}.',onerror:'Continue'},
+  cols:['guest','sent'],rows:[['Leo Park','2:00pm'],['Tomas Okafor','2:00pm']]},
+
+ {id:'task',dsIn:'approved seat',dsOut:'—',count:'11 created',dur:'0.6s',history:['ok','ok','ok','skip','ok','ok'],name:'Create hospitality task',scope:'record',kind:'action',
+  system:'Asana',mode:'write',sub:'Hospitality board',
+  does:'Adds a to-do with the guest\'s dietary and access notes.',
+  conn:{id:'asana',name:'Asana',acct:'production-co · connected'},
+  action:'create',values:{project:'Hospitality — NYFW',assignee:'Hospitality lead',title:'Prep — {{guest.full_name}}, {{assign.show}}',notes:'Dietary: {{guest.dietary}}\nAccess: {{guest.access}}\nSeat: {{assign.seat}}',due:'{{assign.show}} − 2 hours',onerror:'Continue'},
+  cols:['guest','task'],rows:[['Leo Park','Prep — 6pm'],['Tomas Okafor','Prep — 6pm']]},
+
+ {id:'email',dsIn:'approved seat',dsOut:'—',count:'11 sent',dur:'0.5s',history:['ok','ok','ok','skip','ok','ok'],name:'Email the guest',scope:'record',kind:'action',irreversible:true,
+  system:'SendGrid',mode:'write',sub:'cannot be undone',
+  does:'Emails the guest their show and seat. Cannot be undone.',
+  conn:{id:'sendgrid',name:'SendGrid',acct:'nyfw-agency · connected'},
+  action:'send',values:{to:'{{guest.email}}',from:'rsvp@nyfw.com',template:'VIP confirmation',subject:'You\u2019re confirmed for {{assign.show}}',body:'Dear {{guest.full_name}},\n\nYou are confirmed for {{assign.show}}. Your seat is {{assign.seat}}.\n\nDoors open one hour before. Please bring this email.\n\nNYFW Guest Team',retries:'3',onerror:'Send to review'},
+  cols:['guest','sent'],rows:[['Leo Park','2:01pm'],['Tomas Okafor','2:01pm']]}
+];
+
+
+/* ============================================================
+   CONNECTORS
+   Each connector declares its own fields once. A step stores a
+   connector, an action, and values. The panel renders whatever
+   the connector declares, so two steps on the same connector
+   can never show different fields.
+   ============================================================ */
+
+/* ============================================================
+   APP MARKS
+   Geometric stand-ins in each product's colour, not their logos.
+   Enough to tell Slack from Snowflake at a glance on the canvas.
+   ============================================================ */
+const APPS={
+ launchmetrics:{bg:'#111827',fg:'#ffffff',svg:'<path d="M4 13.5 L7.5 9 L10.5 11.5 L15 4.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="4.5" r="1.9" fill="currentColor"/>'},
+ snowflake:{bg:'#E6F6FD',fg:'#1BA0D7',svg:'<g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 3v14M4 6.5l12 7M16 6.5l-12 7"/></g>'},
+ slack:{bg:'#F3E9F4',fg:'#611F69',svg:'<g stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M7.5 4v12M12.5 4v12M4 7.5h12M4 12.5h12"/></g>'},
+ asana:{bg:'#FDECEC',fg:'#E8504F',svg:'<g fill="currentColor"><circle cx="10" cy="5" r="2.4"/><circle cx="5.6" cy="13" r="2.4"/><circle cx="14.4" cy="13" r="2.4"/></g>'},
+ sendgrid:{bg:'#E7F1FC',fg:'#1A73C4',svg:'<path d="M3 10.2 17 4 12.6 16.5 9.7 11.3z" fill="currentColor"/>'},
+ venue:{bg:'#EEF1F5',fg:'#475569',svg:'<g fill="currentColor"><rect x="3.5" y="5" width="4" height="3.4" rx="1"/><rect x="8" y="5" width="4" height="3.4" rx="1"/><rect x="12.5" y="5" width="4" height="3.4" rx="1"/><rect x="3.5" y="10" width="4" height="3.4" rx="1"/><rect x="8" y="10" width="4" height="3.4" rx="1"/><rect x="12.5" y="10" width="4" height="3.4" rx="1"/></g>'}
+};
+const SYS2APP={'Launchmetrics':'launchmetrics','Snowflake':'snowflake','Slack':'slack','Asana':'asana','SendGrid':'sendgrid','Venue ops system':'venue'};
+function appMark(system,size){
+ const a=APPS[SYS2APP[system]];
+ if(!a)return `<span class="appmark blank" style="width:${size}px;height:${size}px"></span>`;
+ return `<span class="appmark" style="width:${size}px;height:${size}px;background:${a.bg};color:${a.fg}">
+   <svg viewBox="0 0 20 20" width="${Math.round(size*0.62)}" height="${Math.round(size*0.62)}">${a.svg}</svg></span>`;
+}
+
+const CONNECTORS = {
+ launchmetrics:{
+  label:'Launchmetrics',
+  actions:{
+   read:{fields:[
+    {g:'Setup',k:'Table',key:'table',ed:'select',opts:['event_rsvps','pr_contacts','pr_segments','seating_charts']},
+    {g:'Setup',k:'Sync mode',key:'sync',ed:'select',opts:['Incremental','Full refresh']},
+    {g:'Advanced',k:'Retries',key:'retries',ed:'select',opts:['0','1','3','5']},
+    {g:'Advanced',k:'Backoff',key:'backoff',ed:'select',opts:['Exponential','Fixed','None']}]},
+   write:{fields:[
+    {g:'Setup',k:'Operation',key:'op',ed:'select',opts:['Assign seat','Hold seat','Release seat']},
+    {g:'Fields',k:'Guest',key:'m_guest',ed:'map'},
+    {g:'Fields',k:'Show',key:'m_show',ed:'map'},
+    {g:'Fields',k:'Seat',key:'m_seat',ed:'map'},
+    {g:'Advanced',k:'Retries',key:'retries',ed:'select',opts:['0','1','3','5']},
+    {g:'Advanced',k:'Backoff',key:'backoff',ed:'select',opts:['Exponential','Fixed','None']},
+    {g:'Advanced',k:'On error',key:'onerror',ed:'select',opts:['Send to review','Continue','Fail run']}]}}},
+ snowflake:{
+  label:'Snowflake',
+  actions:{
+   query:{fields:[
+    {g:'Setup',k:'Destination',key:'target',ed:'text'},
+    {g:'Setup',k:'Write mode',key:'write',ed:'select',opts:['Merge','Append','Replace']},
+    {g:'Setup',k:'Unmatched rows',key:'unmatched',ed:'select',opts:['Quarantine','Discard','Fail run']},
+    {g:'Advanced',k:'Retries',key:'retries',ed:'select',opts:['0','1','3','5']}]},
+   select:{fields:[
+    {g:'Advanced',k:'Concurrency',key:'concurrency',ed:'select',opts:['1','5','10','25']},
+    {g:'Advanced',k:'Deduplication key',key:'dedupe',ed:'text'}]}}},
+ venue:{
+  label:'Venue ops system',
+  actions:{
+   decide:{fields:[
+    {g:'Setup',k:'Instructions',key:'prompt',ed:'area'},
+    {g:'Setup',k:'Can read',key:'tools',ed:'select',opts:['Live capacity and guest history','Live capacity only','Guest history only']},
+    {g:'Setup',k:'Must return',key:'contract',ed:'text'},
+    {g:'Setup',k:'Confidence threshold',key:'threshold',ed:'select',opts:['0.60','0.70','0.80','0.90']},
+    {g:'Setup',k:'Require approval for',key:'escalate',ed:'select',opts:['Tier 1','Tier 1 and VIP','None']},
+    {g:'Advanced',k:'Model',key:'model',ed:'select',opts:['claude-sonnet-4-6','claude-opus-4-1']},
+    {g:'Advanced',k:'On error',key:'onerror',ed:'select',opts:['Send to review','Fail run']}]}}},
+ slack:{
+  label:'Slack',
+  actions:{
+   post:{fields:[
+    {g:'Setup',k:'Channel',key:'channel',ed:'text'},
+    {g:'Message',k:'Text',key:'body',ed:'area'},
+    {g:'Advanced',k:'On error',key:'onerror',ed:'select',opts:['Continue','Fail run']}]},
+   ask:{fields:[
+    {g:'Setup',k:'Assignee',key:'assignee',ed:'select',opts:['Seating lead','Production lead','VIP desk']},
+    {g:'Message',k:'Text',key:'body',ed:'area'},
+    {g:'Message',k:'Buttons',key:'buttons',ed:'text'},
+    {g:'Setup',k:'Timeout',key:'timeout',ed:'select',opts:['30 minutes','2 hours','End of day']},
+    {g:'Setup',k:'On timeout',key:'ontimeout',ed:'select',opts:['Escalate','Continue','Fail run']}]}}},
+ asana:{
+  label:'Asana',
+  actions:{
+   create:{fields:[
+    {g:'Setup',k:'Project',key:'project',ed:'text'},
+    {g:'Setup',k:'Assignee',key:'assignee',ed:'select',opts:['Hospitality lead','Unassigned']},
+    {g:'Fields',k:'Task name',key:'title',ed:'text'},
+    {g:'Fields',k:'Notes',key:'notes',ed:'area'},
+    {g:'Fields',k:'Due date',key:'due',ed:'map'},
+    {g:'Advanced',k:'On error',key:'onerror',ed:'select',opts:['Continue','Fail run']}]}}},
+ sendgrid:{
+  label:'SendGrid',
+  actions:{
+   send:{fields:[
+    {g:'Setup',k:'To',key:'to',ed:'map'},
+    {g:'Setup',k:'From',key:'from',ed:'text'},
+    {g:'Setup',k:'Template',key:'template',ed:'select',opts:['VIP confirmation','Press confirmation','None, write it here']},
+    {g:'Message',k:'Subject',key:'subject',ed:'text'},
+    {g:'Message',k:'Body',key:'body',ed:'area'},
+    {g:'Advanced',k:'Retries',key:'retries',ed:'select',opts:['0','1','3','5']},
+    {g:'Advanced',k:'On error',key:'onerror',ed:'select',opts:['Send to review','Continue']}]}}}
+};
+
+/* What each step makes available to the ones after it. This is what the
+   {{ }} picker offers, and it is read straight off the steps above. */
+const OUTPUTS={
+ fanout:['guest.full_name','guest.email','guest.tier','guest.show_id','guest.dietary','guest.access'],
+ assign:['assign.show','assign.seat','assign.confidence','assign.reasoning'],
+ reserve:['reserve.confirmation_code'],
+ approve:['approve.decision','approve.final_seat','approve.decided_by']
+};
+function varsBefore(id){
+ const i=STEPS.findIndex(x=>x.id===id),out=[];
+ STEPS.slice(0,i).forEach(x=>{(OUTPUTS[x.id]||[]).forEach(v=>out.push(v))});
+ return out;
+}
+function fieldsFor(s){
+  const c=CONNECTORS[s.conn&&s.conn.id];
+  if(!c||!c.actions[s.action])return [];
+  return c.actions[s.action].fields.map(f=>({...f,v:(s.values&&s.values[f.key])!==undefined?s.values[f.key]:''}));
+}
+
+const GUESTS=[
+ {id:'g_204',name:'Leo Park',org:'WSJ · press',state:'done',where:'Seated 6pm · B12',stop:null},
+ {id:'g_118',name:'Mira Osei',org:'Elle · tier 1',state:'stuck',where:'Waiting on approval · 48m',stop:'approve'},
+ {id:'g_077',name:'Tomas Okafor',org:'Hearst · vip',state:'done',where:'Seated 6pm · A03',stop:null},
+ {id:'g_xxx',name:'Anna Chen',org:'Vogue · tier 1',state:'lost',where:'Never reached seating',stop:'join'},
+ {id:'g_yy1',name:'J. Reyes',org:'Freelance · press',state:'lost',where:'Never reached seating',stop:'join'},
+ {id:'g_301',name:'Sana Idris',org:'Dazed · vip',state:'done',where:'Seated 8pm · D18',stop:null}
+];
+
+let ME='Operations',view='ops',mode='flow',unfolded=false,selected=null,tab='cfg';
+const byId=id=>STEPS.find(s=>s.id===id);
+const batch=()=>STEPS.filter(s=>s.scope==='batch');
+const record=()=>STEPS.filter(s=>s.scope==='record');
+const seam=()=>byId('fanout');
+/* What makes an edit risky is what the step touches and what needs it,
+   both readable off the step and the graph. No assigned ownership. */
+function writesOut(s){return s.mode==='write'||s.kind==='load'}
+function lastEdit(s){return s.edited||'3 weeks ago'}
+function consequences(id){
+  const s=byId(id),out=[],dn=downstream(id).slice(0,4);
+  if(writesOut(s)) out.push(`Writes to ${s.system}`);
+  if(s.irreversible) out.push('Reaches the guest. Cannot be undone');
+  if(s.dsOut&&s.dsOut!=='\u2014') out.push(`Produces ${s.dsOut}`);
+  dn.forEach(d=>out.push(`${d.name} runs after it`));
+  if(!out.length) out.push('Nothing after it depends on this');
+  return out;
+}
+const mine=s=>true;
+const downstream=id=>{const i=STEPS.findIndex(s=>s.id===id);return STEPS.slice(i+1).filter(s=>s.scope!=='batch'||STEPS[i].scope==='batch')};
+
+function edges(){const o=[];STEPS.forEach(s=>{if(!s.sql)return;STEPS.forEach(p=>{
+ if(p.id===s.id||!p.produces)return;if(new RegExp('\\b'+p.produces+'\\b').test(s.sql))o.push([p.id,s.id])})});return o}
+
+const toast=t=>{const e=document.getElementById('toast');e.textContent=t;e.classList.add('on');
+ clearTimeout(window._tt);window._tt=setTimeout(()=>e.classList.remove('on'),3000)};
+function bump(){VERSION++;const v=document.getElementById('ver');v.textContent='v'+VERSION;
+ v.classList.add('bump');setTimeout(()=>v.classList.remove('bump'),1600)}
+
+function modeChip(s){
+ let c='';
+ if(s.irreversible)c+=`<span class="chip final" tabindex="0" data-tip="Sends to the guest. Rerunning this step sends a second email.">cannot be undone</span>`;
+ if(s.mode==='live')c+=`<span class="chip live" tabindex="0" data-tip="Reads seat availability from the venue at the moment it runs, not from the hourly refresh.">live lookup</span>`;
+ if(s.mode==='pause')c+=`<span class="chip pause" tabindex="0" data-tip="This guest stops here until the seating lead answers, up to 2 hours. The other guests carry on.">pauses</span>`;
+ return c;
+}
+function nodeEl(s,extra=''){
+ const b=document.createElement('button');
+ b.className='node '+extra+(s.agent?' agent':'')+(s.human?' human':'')+(s.irreversible?' irreversible':'');
+ b.dataset.id=s.id;
+ const own='';
+ const ticks=s.agent?`<span class="ticks"><span class="tick ran" tabindex="0" data-tip="Picked a seat without erroring.">✓</span><span class="tick open" tabindex="0" data-tip="No one has approved the seat yet."></span></span>`:'';
+ const keb=(view==='ops'&&mode==='flow')?`<span class="kebab" data-keb="${s.id}">⋯</span>`:'';
+ b.innerHTML=`<span class="badge">${ticks}${modeChip(s)}${own}${keb}</span>
+  <div class="nm"><span class="kindmark"></span>${s.name}</div>
+  ${view==='data'
+    ? `<div class="sysline">${appMark(s.system,18)}<span>${s.system}</span></div>
+       ${s.dsIn?`<div class="ds in" data-tip="Runs when ${s.dsIn} is rewritten.">
+           <span class="ar">\u2193</span>${s.dsIn}</div>`:''}
+       ${s.dsOut&&s.dsOut!=='\u2014'?`<div class="ds out" data-tip="Rewriting ${s.dsOut} starts the steps that read it.">
+           <span class="ar">\u2192</span>${s.dsOut}</div>`:''}
+       <div class="runline"><span class="sdot ${(s.history||['ok']).slice(-1)[0]}" tabindex="0"
+           data-tip="2:00pm run \u2014 ${STATELBL[(s.history||['ok']).slice(-1)[0]]}. ${WHY[(s.history||['ok']).slice(-1)[0]]}"></span>${s.count||''} \u00b7 ${s.dur||''}
+         <span class="spark" data-tip="The last six hourly runs, oldest on the left.">${(s.history||[]).map((h,i)=>`<i class="${h}" data-tip="${RUNS[i]} run \u2014 ${STATELBL[h]}"></i>`).join('')}</span></div>`
+    : `<div class="sysline">${appMark(s.system,18)}<span>${s.system} \u00b7 ${s.sub}</span></div>
+       ${mode==='flow'?`<div class="runline"><span class="sdot ${(s.history||['ok']).slice(-1)[0]}"></span>${s.count||''}</div>`:''}`}
+`;
+ b.onclick=e=>{const k=e.target.closest('[data-keb]');
+  if(k){e.stopPropagation();openMenu(k,s.id);return}e.stopPropagation();openPanel(s.id)};
+ return b;
+}
+function foldedEl(l,sb){const b=document.createElement('button');b.className='node folded'+(unfolded?' open':'');
+ b.setAttribute('data-tip',view==='ops'?'The 4 steps that build the guest list, collapsed.':'The 6 steps that run for each guest, collapsed.');
+ b.innerHTML=`<span class="chev">▶</span><div class="nm">${l}</div><div class="sysline">${sb}</div>`;
+ b.onclick=e=>{e.stopPropagation();unfolded=!unfolded;render()};return b}
+function jointEl(i){const d=document.createElement('div');d.className='joint';
+ const p=document.createElement('button');p.className='plus';p.textContent='+';
+ p.onclick=e=>{e.stopPropagation();addStepPicker(i,e.target)};d.appendChild(p);return d}
+
+function renderFlow(stage){
+ const w=document.createElement('div');w.className='ops';
+ w.appendChild(foldedEl('Guest data, refreshed hourly','Launchmetrics → Snowflake · 812 guests · 3 dropped'));
+ if(unfolded){const n=document.createElement('div');n.className='nest';
+batch().forEach(s=>n.appendChild(nodeEl(s)));n.appendChild(nodeEl(seam()));w.appendChild(n)}
+ record().forEach((s,i)=>{
+  w.appendChild(jointEl(i));
+  w.appendChild(nodeEl(s))});
+ stage.appendChild(w);
+ const bar=document.createElement('div');bar.className='testbar';
+ bar.innerHTML=`<button id="btnTest">Test run</button><button id="btnHist">Version history</button>`;
+ stage.appendChild(bar);
+ const o=document.createElement('div');o.className='testout';o.id='testout';stage.appendChild(o);
+ document.getElementById('btnTest').onclick=()=>{const t=document.getElementById('testout');t.classList.add('on');
+  t.textContent='Ran once with Mira Osei. Nothing sent, no seat booked. Would have assigned 8pm · C04, then paused for approval.'};
+ document.getElementById('btnHist').onclick=showHistory;
+ note(record().length+' steps \u00b7 runs hourly \u00b7 last run 2:00pm');
+}
+function showHistory(){
+ const all=[];Object.keys(EDITS).forEach(id=>EDITS[id].forEach(e=>{if(e.from!==undefined)all.push({...e,step:byId(id)&&byId(id).name})}));
+ all.sort((a,b)=>b.v-a.v);
+ modal(`<h3>Version history</h3><div class="mb">
+  <div class="impact"><div class="ih">Most recent first</div><ul>
+  ${all.slice(0,8).map(e=>`<li>v${e.v} \u2014 ${e.step}: ${e.f} \u2192 ${e.to}</li>`).join('')}</ul></div></div>
+ <div class="mf"><button class="prim" onclick="closeModal()">Close</button></div>`)}
+
+
+function renderData(stage){
+ const w=document.createElement('div');w.className='data';
+ const c1=document.createElement('div');c1.className='col';
+ batch().slice(0,2).forEach(s=>c1.appendChild(nodeEl(s,'datanode')));
+ const c2=document.createElement('div');c2.className='col mid';c2.appendChild(nodeEl(byId('join'),'datanode'));
+ const c3=document.createElement('div');c3.className='col mid';c3.appendChild(nodeEl(seam(),'datanode'));
+ c3.appendChild(foldedEl('Per-guest processing',record().length+' steps · 12 guests'));
+ if(unfolded){const n=document.createElement('div');n.className='nest';record().forEach(s=>n.appendChild(nodeEl(s)));c3.appendChild(n)}
+ w.append(c1,c2,c3);stage.appendChild(w);
+ note(batch().length+' sources \u00b7 guest_table refreshed hourly \u00b7 last run 2:00pm');
+ requestAnimationFrame(drawWires);
+}
+function drawWires(){const svg=document.getElementById('wires');svg.innerHTML='';if(view!=='data')return;
+ const box=document.getElementById('canvas').getBoundingClientRect();
+ const pos=id=>{const e=document.querySelector(`.node[data-id="${id}"]`);if(!e)return null;
+  const r=e.getBoundingClientRect();return{l:r.left-box.left,r:r.right-box.left,y:r.top-box.top+r.height/2}};
+ edges().forEach(([a,b])=>{const A=pos(a),B=pos(b);if(!A||!B||B.l<A.r)return;
+  const mx=A.r+(B.l-A.r)/2;const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d',`M ${A.r} ${A.y} C ${mx} ${A.y}, ${mx} ${B.y}, ${B.l} ${B.y}`);
+  p.setAttribute('fill','none');p.setAttribute('stroke','#CBD5E1');p.setAttribute('stroke-width','1.25');svg.appendChild(p);
+  const lab=byId(a)&&byId(a).dsOut;if(!lab||lab==='\u2014'||(B.l-A.r)<72)return;
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  const tx=document.createElementNS('http://www.w3.org/2000/svg','text');
+  tx.textContent=lab;tx.setAttribute('x',mx);tx.setAttribute('y',(A.y+B.y)/2-9);
+  tx.setAttribute('text-anchor','middle');tx.setAttribute('fill','#64748B');
+  tx.setAttribute('font-size','12');tx.setAttribute('font-weight','500');
+  tx.setAttribute('font-family',"'Inter',system-ui,sans-serif");
+  const rc=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  rc.setAttribute('fill','#F8FAFC');rc.setAttribute('rx','4');
+  g.appendChild(rc);g.appendChild(tx);svg.appendChild(g);
+  const bb=tx.getBBox();rc.setAttribute('x',bb.x-6);rc.setAttribute('y',bb.y-2);
+  rc.setAttribute('width',bb.width+12);rc.setAttribute('height',bb.height+4)})}
+window.addEventListener('resize',drawWires);
+const note=t=>document.getElementById('viewnote').textContent=t;
+
+function render(){
+ const st=document.getElementById('stage');st.innerHTML='';document.getElementById('wires').innerHTML='';
+ document.getElementById('gridwrap').style.display=view==='data'?'block':'none';
+ if(view==='ops')renderFlow(st);else{renderData(st);renderGrid()}
+ if(selected){const e=document.querySelector(`.node[data-id="${selected}"]`);if(e)e.classList.add('sel')}
+}
+function sync(){document.getElementById('tOps').setAttribute('aria-pressed',view==='ops');
+ document.getElementById('tData').setAttribute('aria-pressed',view==='data');
+}
+document.getElementById('tOps').onclick=()=>{view='ops';sync();render()};
+document.getElementById('tData').onclick=()=>{view='data';sync();render()};
+
+
+const RUNS=['9:00am','10:00am','11:00am','12:00pm','1:00pm','2:00pm'];
+const RUNCLOCK=['09:00:02','10:00:01','11:00:03','12:00:02','13:00:01','14:00:00'];
+/* what kicked each run off — the batch half is on a clock, everything downstream
+   is woken by the dataset above it, exactly as Airflow reports it */
+function runType(step,i){
+  if(step.scope==='batch'&&!step.dsIn) return 'scheduled';
+  return 'dataset_triggered';
+}
+function runId(step,i){
+  const t=runType(step,i);
+  return t+'__2026-09-20T'+RUNCLOCK[i]+'+00:00';
+}
+const SCHEMA={
+ rsvps:[['guest_email','string','0 null'],['show_id','string','0 null'],['rsvp_status','string','0 null'],['responded_at','timestamp','0 null']],
+ profiles:[['email','string','0 null'],['full_name','string','0 null'],['tier','string','12 null'],['affiliation','string','31 null']],
+ join:[['guest_id','string','3 null'],['full_name','string','3 null'],['tier','string','3 null'],['show_id','string','0 null'],['status','string','0 null']],
+ fanout:[['guest_id','string','0 null'],['full_name','string','0 null'],['tier','string','0 null']]
+};
+let runIdx=5;
+/* Record steps get a task history: one row per guest, not one row per
+   scheduled window. This is what an ops user actually looks for. */
+const TASKS={
+ assign:[['Leo Park','ok','6pm \u00b7 B12','2:00:12pm'],['Tomas Okafor','ok','6pm \u00b7 A03','2:00:13pm'],
+   ['Mira Osei','hold','8pm \u00b7 C04 \u2014 low confidence','2:00:14pm'],['Sana Idris','ok','8pm \u00b7 D18','2:00:15pm']],
+ reserve:[['Leo Park','ok','Seat assigned','2:00:20pm'],['Tomas Okafor','ok','Seat assigned','2:00:21pm'],
+   ['Mira Osei','hold','Held, awaiting approval','2:00:22pm'],['Sana Idris','ok','Seat assigned','2:00:23pm']],
+ approve:[['Mira Osei','hold','Waiting 48m \u00b7 seating lead','2:00:24pm'],['Leo Park','skip','Not required','2:00:24pm'],
+   ['Tomas Okafor','skip','Not required','2:00:24pm'],['Sana Idris','skip','Not required','2:00:25pm']],
+ notify:[['Leo Park','ok','Posted to #seating-ops','2:00:30pm'],['Tomas Okafor','ok','Posted to #seating-ops','2:00:31pm'],
+   ['Sana Idris','ok','Posted to #seating-ops','2:00:32pm']],
+ task:[['Leo Park','ok','Task created','2:00:35pm'],['Tomas Okafor','ok','Task created','2:00:36pm'],
+   ['Sana Idris','ok','Task created','2:00:37pm']],
+ email:[['Leo Park','ok','Sent','2:00:41pm'],['Tomas Okafor','ok','Sent','2:00:42pm'],
+   ['Sana Idris','ok','Sent','2:00:43pm']]
+};
+/* Records that never reached this step. The Ops view cannot explain a
+   failure in the batch half, so it names where it happened and links there. */
+const MISSING={
+ assign:{at:'join',atName:'Clean, join and save the guest list',
+  rows:[['Anna Chen','anna@gmail.com'],['J. Reyes','j.reyes@me.com'],['T. Okafor','t.okafor@icloud.com']]}
+};
+const TASKLBL={ok:'Done',hold:'Waiting',fail:'Failed',skip:'Skipped'};
+let taskIdx=null;
+/* connector fields an ops user needs to build the step, vs the rest */
+const ADVANCED=['retries','backoff','concurrency','dedupe','model'];
+
+/* Every edit to a step is recorded against that step. This is what
+   replaces code review: nothing is blocked, everything is revertable. */
+const EDITS={
+ rsvps:[{v:3,at:'12 Aug',who:'Data',f:'Sync mode',from:'Full refresh',to:'Incremental'},
+        {v:1,at:'2 Aug',who:'Data',f:'Step created'}],
+ profiles:[{v:1,at:'2 Aug',who:'Data',f:'Step created'}],
+ join:[{v:5,at:'28 Aug',who:'Data',f:'Query',from:'joined on email only',to:'joined on email'},
+       {v:2,at:'4 Aug',who:'Data',f:'Unmatched rows',from:'Discard',to:'Quarantine'},
+       {v:1,at:'2 Aug',who:'Data',f:'Step created'}],
+ fanout:[{v:1,at:'2 Aug',who:'Engineering',f:'Step created'}],
+ assign:[{v:6,at:'30 Aug',who:'Operations',f:'Require approval for',from:'None',to:'Tier 1'},
+         {v:4,at:'19 Aug',who:'Operations',f:'Confidence threshold',from:'0.70',to:'0.80'},
+         {v:1,at:'2 Aug',who:'Engineering',f:'Step created'}],
+ reserve:[{v:7,at:'2 Sep',who:'Engineering',f:'Retries',from:'1',to:'3'},
+          {v:1,at:'2 Aug',who:'Engineering',f:'Step created'}],
+ approve:[{v:6,at:'30 Aug',who:'Operations',f:'Timeout',from:'End of day',to:'2 hours'},
+          {v:1,at:'2 Aug',who:'Operations',f:'Step created'}],
+ notify:[{v:1,at:'2 Aug',who:'Operations',f:'Step created'}],
+ task:[{v:1,at:'2 Aug',who:'Operations',f:'Step created'}],
+ email:[{v:1,at:'2 Aug',who:'Operations',f:'Step created'}]
+};
+function logEdit(id,field,from,to){
+ (EDITS[id]=EDITS[id]||[]).unshift({v:VERSION,at:'just now',who:'You',f:field,from,to,live:true});
+}
+function revert(id,i){
+ const e=EDITS[id][i],st=byId(id);
+ if(!st||e.from===undefined)return;
+ const key=(fieldsFor(st).find(f=>f.k===e.f)||{}).key;
+ if(key){st.values[key]=e.from}
+ else if(e.f==='Query'){st.sql=e.from}
+ bump();logEdit(id,e.f,e.to,e.from);render();paintBody();toast('Reverted to '+e.from);
+}
+/* Why a step ended up in each state. Written once, used by the chip in the
+   panel, the cells in the grid and the bars on every node. */
+const WHY={
+ ok:'Completed without errors.',
+ quiet:'Completed, but 3 guests were quarantined. No alert was raised.',
+ fail:'Failed after 3 retries. Every step below it was skipped.',
+ skip:'Did not run. The step above it failed, so it had no input.'
+};
+const STATELBL={ok:'Success',quiet:'Success, rows quarantined',fail:'Failed',skip:'Skipped'};
+function renderGrid(){const t=document.createElement('table');t.className='grid';
+ let h='<tr><td class="n"></td>'+RUNS.map(r=>`<th>${r}</th>`).join('')+'</tr>';
+ [...batch(),seam(),...record()].forEach(s=>{h+=`<tr><td class="n">${s.name}</td>`;
+  RUNS.forEach((r,i)=>{const v=(s.history&&s.history[i])||'ok';
+   h+=`<td><span class="cell ${v==='ok'?'':v}" tabindex="0"
+     data-tip="<b>${s.name}</b><br>${r} run \u2014 ${STATELBL[v]}. ${WHY[v]}"></span></td>`});h+='</tr>'});
+ t.innerHTML=h;const b=document.getElementById('gridbody');b.innerHTML='';b.appendChild(t)}
+
+/* ---------- menu ---------- */
+function openMenu(a,id){const s=byId(id),m=document.getElementById('menu');const r=a.getBoundingClientRect();
+ m.innerHTML=
+  `<button onclick="openPanel('${id}');hideMenu()">Open</button>
+   <button onclick="openPanel('${id}');hideMenu()">Edit fields</button>
+   <div class="dv"></div>
+   <button onclick="tryDelete('${id}')" style="color:var(--stop)">Delete</button>`;
+ m.style.left=Math.min(r.left-160,innerWidth-220)+'px';m.style.top=(r.bottom+6)+'px';m.classList.add('on')}
+const hideMenu=()=>document.getElementById('menu').classList.remove('on');
+document.addEventListener('click',e=>{if(!e.target.closest('#menu')&&!e.target.closest('[data-keb]'))hideMenu()});
+
+/* ---------- consequences before editing someone else's step ---------- */
+let pendingEdit=null;
+function confirmForeignEdit(s,apply){
+ modal(`<h3>Change “${s.name}”?</h3>
+  <div class="mb">${s.does}
+   <div class="impact"><div class="ih">Affected</div><ul>
+    ${consequences(s.id).map(c=>`<li>${c}</li>`).join('')}
+    <li>Takes effect on the next run</li>
+   </ul></div></div>
+  <div class="mf"><button onclick="closeModal();cancelEdit()">Cancel</button>
+   <button class="prim" onclick="closeModal();window._apply&&window._apply()">Save</button></div>`);
+ window._apply=apply;
+}
+function cancelEdit(){window._apply=null;paintBody()}
+
+/* ---------- delete ---------- */
+function goUpstream(id){
+ view='data';unfolded=false;sync();render();openPanel(id);setTab('data');
+ toast('Opened the step where they dropped');
+}
+function tryDelete(id){hideMenu();const s=byId(id);const dn=downstream(id).slice(0,4);
+ modal(`<h3>Delete “${s.name}”?</h3><div class="mb">${s.does}
+  <div class="impact"><div class="ih">Affected</div><ul>
+   ${writesOut(s)?`<li>Stops writing to ${s.system}</li>`:''}
+   ${dn.length?dn.map(d=>`<li>${d.name} would have nothing to use</li>`).join(''):'<li>No later step depends on it</li>'}
+   ${s.irreversible?'<li>This is the step that reaches the guest</li>':''}
+   <li>Last changed ${lastEdit(s)}</li>
+  </ul></div></div>
+  <div class="mf"><button onclick="closeModal()">Cancel</button>
+   <button class="danger" onclick="doDelete('${id}')">Delete</button></div>`)}
+function doDelete(id){const s=byId(id);STEPS.splice(STEPS.findIndex(x=>x.id===id),1);closeModal();bump();
+ selected=null;document.getElementById('panel').classList.remove('on');document.body.classList.remove('panelopen');render();
+ toast('Step deleted. Both views updated.')}
+
+/* ---------- add ---------- */
+const LIBRARY=[
+ {kind:'action',name:'Send a Slack message',system:'Slack',mode:'write',does:'Posts to a channel.',fields:[{k:'Channel',v:'#vip-desk',ed:'text'}]},
+ {kind:'action',name:'Create a task',system:'Asana',mode:'write',does:'Adds a to-do.',fields:[{k:'Project',v:'Hospitality — NYFW',ed:'text'}]},
+ {kind:'condition',name:'Only continue if',system:'',mode:'',does:'Continues only if a condition is met.',fields:[{k:'Continue when',v:'tier is VIP',ed:'text'}]},
+ {kind:'human step',name:'Ask a person',system:'Slack',mode:'pause',human:true,does:'Waits for someone to decide.',fields:[{k:'Ask',v:'Seating lead',ed:'text'}]},
+ {kind:'decision',name:'Let AI decide',system:'Venue ops system',mode:'',agent:true,does:'Picks an option for each guest.',fields:[{k:'Ask a person when less sure than',v:'0.80',ed:'text'}]}
+];
+function addStepPicker(index,target){const m=document.getElementById('menu');const r=target.getBoundingClientRect();
+ m.innerHTML=`<div class="cap">Add a step here</div><div class="picker">`+
+  LIBRARY.map((l,i)=>`<button onclick="insertStep(${index},${i})">${appMark(l.system,24)}
+   <span><b>${l.name}</b><span>${l.does}</span></span></button>`).join('')+`</div>`;
+ m.style.left=Math.min(r.left-120,innerWidth-300)+'px';m.style.top=(r.bottom+6)+'px';m.classList.add('on')}
+function insertStep(index,li){hideMenu();const l=LIBRARY[li];
+ const s={id:'new_'+Date.now(),name:l.name,scope:'record',kind:l.kind,system:l.system,mode:l.mode,
+  sub:'added just now',does:l.does,agent:l.agent,human:l.human,
+  conn:{name:l.system,acct:'connected'},fields:JSON.parse(JSON.stringify(l.fields)),
+  cols:['guest','result'],rows:[['—','runs on the next run']]};
+ const at=STEPS.findIndex(x=>x.id===record()[index].id);STEPS.splice(at,0,s);
+ bump();render();toast('Added. Switch to Data and it is there too.')}
+
+/* ---------- panel ---------- */
+const setTab=t=>{tab=t;paintTabs();paintBody()};
+function openPanel(id){selected=id;tab='cfg';const s=byId(id);if(!s)return;
+ document.getElementById('pTitle').textContent=s.name;
+ document.getElementById('pKind').textContent=s.kind+' · '+(s.scope==='batch'?'runs once over the whole list':s.scope==='record'?'runs once per guest':'splits the list into individuals');
+ document.getElementById('pOwner').innerHTML=
+  (s.agent?`<span class="chip decides" tabindex="0" data-tip="Chooses the seat instead of following a rule. Running it again can produce a different seat.">AI</span>`:'')+
+  (s.mode==='live'?`<span class="chip live" tabindex="0" data-tip="Reads seat availability from the venue at the moment it runs, not from the hourly refresh.">live lookup</span>`:'')+
+  (s.irreversible?`<span class="chip final" tabindex="0" data-tip="Sends to the guest. Rerunning this step sends a second email.">cannot be undone</span>`:'')+
+  `<span class="owner">Last changed ${lastEdit(s)}</span>`;
+ const d=document.getElementById('pDel');d.style.display=(view==='ops'&&mode==='flow')?'inline':'none';d.onclick=()=>tryDelete(id);
+ document.getElementById('panel').classList.add('on');document.body.classList.add('panelopen');paintTabs();paintBody();render()}
+document.getElementById('pClose').onclick=()=>{document.getElementById('panel').classList.remove('on');document.body.classList.remove('panelopen');selected=null;render()};
+document.getElementById('tabCfg').onclick=()=>setTab('cfg');
+document.getElementById('tabData').onclick=()=>setTab('data');
+document.getElementById('tabRun').onclick=()=>{taskIdx=null;setTab('run')};
+document.getElementById('tabVer').onclick=()=>setTab('ver');
+function paintTabs(){['Cfg','Data','Run','Ver'].forEach(t=>document.getElementById('tab'+t).setAttribute('aria-selected',tab===t.toLowerCase()))}
+
+function paintBody(){
+ const s=byId(selected);if(!s)return;const b=document.getElementById('pBody');let h='';
+ if(tab==='cfg'){
+  if(s.conn)h+=`<div class="field"><div class="k">Connection</div>
+   <div class="conn">${appMark(s.conn.name,32)}<span class="cn"><b>${s.conn.name}</b><span>${s.conn.acct}</span></span>
+   <button onclick="connInfo('${s.id}')">Change</button></div></div>`;
+  if(s.sql)h+=`<div class="field"><div class="k">${
+     s.kind==='transform'?'Query'
+     :s.kind==='fan out'?'Selection'
+     :s.kind==='load'?'Query'
+     :'Query'}</div>
+   <textarea class="sql" id="sqlBox" spellcheck="false">${s.sql}</textarea>
+   <div class="sqlhint">Referenced tables determine upstream dependencies.</div>
+   <div class="arrowsnote" id="arrowsNote">Dependencies updated.</div></div>`;
+  /* fields come from the connector, not the step, so any two steps on
+     the same connector always show the same shape */
+  const renderF=f=>{
+   const id='f_'+f.key;
+   if(f.ed==='select')return `<div class="field"><div class="k">${f.k}</div>
+     <select class="ed" data-key="${f.key}">${f.opts.map(o=>`<option${o===f.v?' selected':''}>${o}</option>`).join('')}</select></div>`;
+   if(f.ed==='area')return `<div class="field"><div class="k">${f.k}</div>
+     <textarea class="ed area" id="${id}" data-key="${f.key}" rows="5">${f.v||''}</textarea>
+     <div class="vars" data-for="${id}"></div></div>`;
+   if(f.ed==='map')return `<div class="field"><div class="k">${f.k}</div>
+     <input class="ed mapped" id="${id}" data-key="${f.key}" value="${f.v||''}">
+     <div class="vars" data-for="${id}"></div></div>`;
+   return `<div class="field"><div class="k">${f.k}</div>
+     <input class="ed" id="${id}" data-key="${f.key}" value="${f.v||''}">
+     <div class="vars" data-for="${id}"></div></div>`;
+  };
+  const ff=fieldsFor(s);
+  const groups=['Setup','Fields','Message','Advanced'];
+  groups.forEach(g=>{
+   const inG=ff.filter(f=>(f.g||'Setup')===g);
+   if(!inG.length)return;
+   if(g==='Advanced'){
+    h+=`<details class="adv"${s.scope!=='record'?' open':''}><summary>Advanced</summary>${inG.map(renderF).join('')}</details>`;
+   } else {
+    if(g!=='Setup')h+=`<div class="grouphead">${g}</div>`;
+    h+=inG.map(renderF).join('');
+   }
+  });
+  if(s.agent)h+=`<div class="railbox"><h3>Constraints</h3><ul>
+   <li>Shows with remaining capacity only</li><li>Excludes held seat blocks</li>
+   <li>Escalates below the confidence threshold</li></ul></div>`;
+ }
+ if(tab==='data'){
+  if(SCHEMA[s.id]){
+   h+=`<div class="field"><div class="k">Output schema</div>
+     <div class="schema">${SCHEMA[s.id].map(c=>`<div class="sr"><span class="cn">${c[0]}</span><span class="ct">${c[1]}</span><span class="cnull" tabindex="0" data-tip="${c[2].startsWith('0')?'Every row has a value.':c[2].split(' ')[0]+' guests came through with this column empty.'}">${c[2]}</span></div>`).join('')}</div></div>`;
+   h+=`<div class="kv"><span class="kk">Last updated</span><span class="vv" tabindex="0" data-tip="When guest_table was last written.">2:00pm, 41 minutes ago</span></div>
+       <div class="kv"><span class="kk">Rows</span><span class="vv">${s.count||'\u2014'}</span></div>`;
+  }
+  h+=`<div class="field" style="margin-top:var(--s-4)"><div class="k">Sample rows</div>
+   <table class="rows"><thead><tr>${s.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+   <tbody>${s.rows.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  if(s.id==='join')h+=`<div class="field"><div class="k">Quarantined rows (3)</div>
+   <table class="rows"><thead><tr><th>rsvp email</th><th>show</th><th>why</th></tr></thead><tbody>
+   <tr class="drop"><td>anna@gmail.com</td><td>6pm</td><td>no profile</td></tr>
+   <tr class="drop"><td>j.reyes@me.com</td><td>8pm</td><td>no profile</td></tr>
+   <tr class="drop"><td>t.okafor@icloud.com</td><td>6pm</td><td>no profile</td></tr></tbody></table></div>
+   <div class="callout">All three RSVP'd from a personal address. Launchmetrics holds their work address on the profile, so matching on email alone missed them.
+   <button id="fixJoin">Match on name and phone too</button></div>`;
+ }
+ if(tab==='run'){
+  if(s.scope==='record'&&TASKS[s.id]){
+   /* ---- ops: one row per guest ---- */
+   const rows=TASKS[s.id];
+   h+=`<div class="tasklist">`+rows.map((t,i)=>`
+     <button class="taskrow ${i===taskIdx?'open':''}" onclick="taskIdx=${i===taskIdx?'null':i};paintBody()">
+       <span class="tdot ${t[1]}"></span>
+       <span class="tname">${t[0]}</span>
+       <span class="tdetail">${t[2]}</span>
+       <span class="ttime">${t[3]}</span></button>
+     ${i===taskIdx?`<div class="taskbody">
+       <div class="kv"><span class="kk">Status</span><span class="vv">${TASKLBL[t[1]]}</span></div>
+       <div class="kv"><span class="kk">Guest</span><span class="vv">${t[0]}</span></div>
+       <div class="kv"><span class="kk">Result</span><span class="vv">${t[2]}</span></div>
+       <div class="kv"><span class="kk">Time</span><span class="vv">${t[3]}</span></div>
+       ${t[1]==='hold'?`<div class="kv"><span class="kk">Waiting on</span><span class="vv">Seating lead</span></div>`:''}
+       <div class="runacts">
+        <button onclick="event.stopPropagation();toast('Replayed for ${t[0]}')">Replay for this guest</button>
+        ${t[1]==='hold'?`<button onclick="event.stopPropagation();toast('Reminder sent to the seating lead')">Send a reminder</button>`:''}
+       </div></div>`:''}`).join('')+`</div>`;
+   h+=`<div class="taskfoot">${rows.filter(r=>r[1]==='ok').length} done \u00b7 ${
+     rows.filter(r=>r[1]==='hold').length} waiting \u00b7 ${rows.filter(r=>r[1]==='skip').length} skipped</div>`;
+   const miss=MISSING[s.id];
+   if(miss)h+=`<div class="missing">
+     <div class="mh"><span class="mdot"></span>${miss.rows.length} never reached this step</div>
+     <div class="mrows">${miss.rows.map(r=>`<div class="mrow"><span>${r[0]}</span><span class="me">${r[1]}</span></div>`).join('')}</div>
+     <div class="mwhy">Dropped at <b>${miss.atName}</b>, 2:15pm.</div>
+     <button class="mbtn" onclick="goUpstream('${miss.at}')">Open that step</button>
+   </div>`;
+  } else {
+   /* ---- data: one row per scheduled run ---- */
+   const st=(s.history&&s.history[runIdx])||'ok';
+   h+=`<div class="runpick">`+RUNS.map((r,i)=>{
+     const v=(s.history&&s.history[i])||'ok';
+     return `<button onclick="runIdx=${i};paintBody()" aria-pressed="${i===runIdx}"
+       data-tip="<b>${r} run</b> \u2014 ${STATELBL[v]}. ${WHY[v]}">
+       <span class="bar ${v==='ok'?'':v}"></span>${r.replace(':00','')}</button>`}).join('')+`</div>`;
+   h+=`<div class="kv"><span class="kk">State</span><span class="vv"><span class="state ${st}" tabindex="0" data-tip="${WHY[st]}">${STATELBL[st]}</span></span></div>`;
+   h+=`<div class="kv"><span class="kk">Run type</span><span class="vv" tabindex="0" data-tip="${
+       runType(s,runIdx)==='scheduled'?'Started by the hourly schedule.':'Started because '+s.dsIn+' was rewritten.'}">${runType(s,runIdx)}</span></div>`;
+   h+=`<div class="kv"><span class="kk">Run ID</span><span class="vv mono">${runId(s,runIdx)}</span></div>`;
+   h+=`<div class="kv"><span class="kk">Triggered by</span><span class="vv">${s.dsIn?'<b>'+s.dsIn+'</b> updated':'Hourly schedule'}</span></div>`;
+   h+=`<div class="kv"><span class="kk">Started</span><span class="vv">${RUNCLOCK[runIdx]} UTC</span></div>`;
+   h+=`<div class="kv"><span class="kk">Duration</span><span class="vv">${st==='skip'?'\u2014':(s.dur||'\u2014')}</span></div>`;
+   h+=`<div class="kv"><span class="kk">Attempt</span><span class="vv" tabindex="0" data-tip="Retries 3 times, waiting longer between each.">${st==='fail'?'3 of 3':'1 of 3'}</span></div>`;
+   if(s.dsIn) h+=`<div class="kv"><span class="kk">Reads</span><span class="vv mono">${s.dsIn}</span></div>`;
+   if(s.dsOut&&s.dsOut!=='\u2014') h+=`<div class="kv"><span class="kk">Produces</span><span class="vv mono">${s.dsOut}</span></div>`;
+   h+=`<div class="kv"><span class="kk">Rows out</span><span class="vv">${st==='skip'?'\u2014':(s.count||'\u2014')}</span></div>`;
+   h+=`<div class="kv"><span class="kk">Next run</span><span class="vv">${s.dsIn?'On next <b>'+s.dsIn+'</b> update':'3:00pm'}</span></div>`;
+   h+=`<div class="runacts">
+       <button onclick="toast('Cleared. Step will rerun for ${RUNS[runIdx]}.')">Clear and rerun</button>
+       <button onclick="toast('Cleared. This step and all downstream steps will rerun.')">Rerun downstream</button>
+       <button onclick="toast('Marked as success. Downstream steps released.')">Mark as success</button>
+       <button onclick="openDrawer('${s.id}')">Open logs</button></div>`;
+   if(s.id==='join'&&st==='quiet')h+=`<div class="callout">3 guests quarantined at this step and no alert was raised. <button id="seeDropped">See rows</button></div>`;
+  }
+ }
+ if(tab==='ver'){
+  const log=EDITS[s.id]||[];
+  h+=`<div class="verlist">`+log.map((e,i)=>`
+    <div class="verrow${i===0?' current':''}">
+      <div class="vhead"><span class="vnum">v${e.v}</span>
+        <span class="vwho">${e.who}</span><span class="vat">${e.at}</span></div>
+      <div class="vwhat">${e.f}${e.from!==undefined?`
+        <div class="vdiff"><span class="was">${e.from}</span> <span class="ar">\u2192</span> <span class="now">${e.to}</span></div>`:''}</div>
+      ${e.from!==undefined&&i>0?`<button class="vrev" onclick="revert('${s.id}',${i})">Restore this value</button>`:''}
+    </div>`).join('')+`</div>`;
+  h+=`<div class="taskfoot">${log.length} change${log.length===1?'':'s'} to this step</div>`;
+ }
+ b.innerHTML=h;
+
+ /* the picker offers only what steps above this one actually produce */
+ const vlist=varsBefore(s.id);
+ b.querySelectorAll('.vars').forEach(v=>{
+  const host=document.getElementById(v.dataset.for);if(!host||!vlist.length)return;
+  v.innerHTML=vlist.map(x=>`<button class="vchip" data-v="${x}">${x}</button>`).join('');
+  v.querySelectorAll('.vchip').forEach(c=>c.onmousedown=e=>{e.preventDefault();
+   const t='{{'+c.dataset.v+'}}';const p=host.selectionStart||host.value.length;
+   host.value=host.value.slice(0,p)+t+host.value.slice(host.selectionEnd||p);
+   host.focus();host.dispatchEvent(new Event('change'))});
+  host.addEventListener('focus',()=>v.classList.add('on'));
+  host.addEventListener('blur',()=>setTimeout(()=>v.classList.remove('on'),120));
+ });
+
+ b.querySelectorAll('[data-key]').forEach(el=>{
+  const prev=el.value, key=el.dataset.key;
+  const apply=()=>{s.values=s.values||{};
+   const label=(fieldsFor(s).find(f=>f.key===key)||{}).k||key;
+   const from=s.values[key];
+   s.values[key]=el.value;bump();logEdit(s.id,label,from,el.value);
+   if(key==='channel')s.sub=el.value;
+   render();toast('Saved. Both views updated.')};
+  /* only the changes that reach outside the product ask first */
+  const heavy=['unmatched','retries','backoff','onerror','op','template','timeout','ontimeout'].includes(key);
+  if(el.tagName==='TEXTAREA'){el.oninput=()=>{s.values=s.values||{};s.values[key]=el.value};
+   el.onblur=()=>{if(el.value!==prev){bump();logEdit(s.id,(fieldsFor(s).find(f=>f.key===key)||{}).k||key,'…','…');render()}};return}
+  el.onchange=()=>{
+   const v=el.value;
+   if(heavy){el.value=prev;
+    confirmForeignEdit(s,()=>{el.value=v;apply()});return}
+   apply()}});
+
+ const box=document.getElementById('sqlBox');
+ if(box){let sqlBefore=s.sql;
+  box.onblur=()=>{if(box.value!==sqlBefore){logEdit(s.id,'Query',sqlBefore.split('\n')[0]+'…',box.value.split('\n')[0]+'…');sqlBefore=box.value;bump()}};
+  box.oninput=()=>{s.sql=box.value;
+  if(view==='data'){drawWires();const n=document.getElementById('arrowsNote');
+   if(n){n.classList.add('on');clearTimeout(window._a);window._a=setTimeout(()=>n.classList.remove('on'),1400)}}}};
+ const fx=document.getElementById('fixJoin');
+ if(fx)fx.onclick=()=>{const j=byId('join');
+  const go=()=>{j.sql=j.sql.replace('lower(r.email) = lower(p.email)','lower(r.email) = lower(p.email)\n     or (lower(r.full_name) = lower(p.full_name) and r.phone = p.phone)');
+   j.sub='812 matched · 0 dropped';bump();setTab('cfg');render();
+   toast('Matching rule updated.')};
+  mine(j)?go():confirmForeignEdit(j,go)};
+}
+
+function connInfo(id){const s=byId(id);
+ modal(`<h3>Change connection</h3>
+  <div class="mb"><div class="conn" style="margin-bottom:var(--s-3)">${appMark(s.conn.name,32)}<span class="cn"><b>${s.conn.name}</b><span>${s.conn.acct}</span></span></div>This connection is shared across every workflow that uses ${s.conn.name}.
+   <div class="impact"><div class="ih">Changing it would</div><ul>
+    <li>Affects every step on this connection</li>
+    <li>Requires reauthentication</li>
+    <li>Pauses runs until reauthorised</li></ul></div></div>
+  <div class="mf"><button onclick="closeModal()">Cancel</button><button class="prim" onclick="closeModal();toast('Opening connection settings')">Connection settings</button></div>`)}
+
+function modal(h){document.getElementById('modal').innerHTML=h;document.getElementById('scrim').classList.add('on')}
+function closeModal(){document.getElementById('scrim').classList.remove('on')}
+document.getElementById('scrim').onclick=e=>{if(e.target.id==='scrim')closeModal()};
+
+function src(scope){const list=scope==='all'?STEPS:[byId(scope)];
+ return `{\n  "workflow": "vip_rsvp_seating",\n  "version": ${VERSION},\n  "steps": [\n`+list.map(s=>{
+  let t=`  {\n    "id": "${s.id}",\n    "name": "${s.name}",\n    "kind": "${s.kind.replace(' ','_')}",\n`;
+  t+=`    "system": "${s.system}",\n    "runs": "${s.agent?'agentic':s.human?'human':'deterministic'}",\n    "scope": "${s.scope}"`;
+  if(s.mode==='live')t+=`,\n    "reads": "live, not stored"`;
+  if(s.sql)t+=`,\n    "sql": ${JSON.stringify(s.sql)}`;
+  if(s.irreversible)t+=`,\n    "reversible": false`;
+  return t+`\n  }`}).join(',\n')+`\n  ]\n}`}
+const paint=c=>c.replace(/("[\w_]+")(\s*:)/g,'<span class="key">$1</span>$2')
+ .replace(/:\s*("(?:[^"]*)")/g,': <span class="str">$1</span>')
+ .replace(/:\s*(\d+|true|false)/g,': <span class="num">$1</span>');
+function openDrawer(sc){document.getElementById('dScope').textContent=sc==='all'?'whole workflow':'this step only';
+ document.getElementById('dCode').innerHTML=paint(src(sc));
+ document.getElementById('dfoot').textContent=(sc==='all'?STEPS.length+' steps':'1 step')+' \u00b7 version '+VERSION;document.getElementById('drawer').classList.add('on')}
+document.getElementById('srcAll').onclick=()=>openDrawer('all');
+document.getElementById('pSrc').onclick=()=>openDrawer(selected||'all');
+document.getElementById('dClose').onclick=()=>document.getElementById('drawer').classList.remove('on');
+document.getElementById('drawer').onclick=e=>{if(e.target.id==='drawer')document.getElementById('drawer').classList.remove('on')};
+
+/* =========================================================
+   CONVERSATION → PROPOSED CHANGES TO THE SAME OBJECT
+   It never asks a question it can already answer itself.
+   Clarifying questions are only ever about judgment.
+   ========================================================= */
+const FLOWS={
+ drops:{
+  starter:'Stop losing guests whose emails don\u2019t match',
+  match:/match|drop|lost|email|miss/i,
+  t1:{looked:['Read the workflow: 10 steps, 2 sources','Read the Launchmetrics profile schema','Read the last 6 runs'],
+   say:`Three guests dropped at <b>Clean, join and save the guest list</b> in the 2:00pm run. Anna Chen, J. Reyes and Tomas Okafor all RSVP\u2019d from a personal address. Launchmetrics has a work address on their profile, so matching on email missed them.
+    <span class="q">How do you want unmatched guests handled?</span>
+    `,
+   opts:[
+    {l:'Match them on name and phone as well',go:'t2'},
+    {l:'Hold them for someone to confirm by hand',go:'hold'},
+    {l:'Leave the matching alone, just tell me when it happens',go:'alert'}]},
+  t2:{looked:['Dry ran the new join against the 2:00pm data','Checked who owns the step'],
+   say:'Here is the change. It widens the match to fall back on name and phone.',
+   edits:[{tag:'chg',step:'Clean, join and save the guest list',
+    body:`Matching rule<pre>left join profiles p
+  on lower(r.email) = lower(p.email)<span class="ins">
+  or (lower(r.full_name) = lower(p.full_name)
+      and r.phone = p.phone)</span></pre>`}],
+   affect:'812 rows match instead of 809. Changes the Data view.',
+   apply:()=>{const j=byId('join');
+    j.sql=j.sql.replace('lower(r.email) = lower(p.email)','lower(r.email) = lower(p.email)\n     or (lower(r.full_name) = lower(p.full_name) and r.phone = p.phone)');
+    j.sub='812 matched \u00b7 0 dropped';j.values.unmatched='Quarantine'}},
+  hold:{looked:['Checked where a hold step could sit','Checked who reviews today'],
+   say:'Unmatched guests would stop and wait for a person instead of disappearing.',
+   edits:[{tag:'add',step:'Confirm unmatched guests',
+    body:`Runs after <code>Clean, join and save the guest list</code>, only when rows fail to match. Posts each one to the seating lead in Slack with Accept and Reject.`},
+    {tag:'chg',step:'Clean, join and save the guest list',
+     body:`Rows that do not match <span class="was">Flag for review</span> \u2192 <code>Send to confirmation step</code>`}],
+   affect:'Adds a step to the Data view. About 3 guests a run would wait on a person.',
+   apply:()=>{const s={id:'hold_'+Date.now(),name:'Confirm unmatched guests',scope:'batch',kind:'human step',human:true,
+    system:'Slack',mode:'pause',sub:'#vip-desk \u00b7 only when rows fail to match',
+    does:'Stops unmatched guests from disappearing, and asks a person to confirm who they are.',
+    conn:{id:'slack',name:'Slack',acct:'fashionweek-ops \u00b7 connected'},sql:'select * from guest_table where matched = false',produces:'confirmed_rows',
+    fields:[{k:'Ask',v:'Seating lead',ed:'select',opts:['Seating lead','VIP desk']},{k:'If no answer within',v:'30 minutes',ed:'select',opts:['30 minutes','2 hours']}],
+    cols:['name','rsvp email'],rows:[['Anna Chen','anna@gmail.com'],['J. Reyes','j.reyes@me.com']]};
+    STEPS.splice(STEPS.findIndex(x=>x.id==='fanout'),0,s)}},
+  alert:{looked:['Counted drops across the last 6 runs'],
+   say:'Seven guests dropped in the last six runs and nobody was told. This adds the alert without touching how matching works.',
+   edits:[{tag:'add',step:'Post dropped guests to Slack',
+    body:`Runs after the merge, once per run, only when the dropped count is above zero. Posts names and emails to <code>#vip-desk</code>.`}],
+   affect:'Adds a step to the Data view. Would have caught Anna at 2:15pm instead of 4pm.',
+   apply:()=>{const s={id:'alert_'+Date.now(),name:'Post dropped guests to Slack',scope:'batch',kind:'action',
+    system:'Slack',mode:'write',sub:'#vip-desk \u00b7 only when rows drop',
+    does:'Posts the names of anyone who fell out of the merge, so nobody disappears quietly.',
+    conn:{id:'slack',name:'Slack',acct:'fashionweek-ops \u00b7 connected'},sql:'select * from guest_table where matched = false',produces:'drop_alert',
+    fields:[{k:'Channel',v:'#vip-desk',ed:'text'},{k:'Only post when',v:'More than 0 rows dropped',ed:'select',opts:['More than 0 rows dropped','Always']}],
+    cols:['name','email'],rows:[['Anna Chen','anna@gmail.com'],['J. Reyes','j.reyes@me.com']]};
+    STEPS.splice(STEPS.findIndex(x=>x.id==='fanout'),0,s)}}},
+
+ vogue:{
+  starter:'Never auto-seat anyone from Vogue',
+  match:/vogue|auto.?seat|never seat|always ask/i,
+  t1:{looked:['Read the rules on Assign show and seat','Counted Vogue guests across the week'],
+   say:`<b>Assign show and seat</b> already escalates tier 1 guests. Vogue has 14 guests across the week and 9 of them are not tier 1, so this would widen it.
+   <span class="q">Vogue titles, or Vogue US only?</span>
+   `,
+   opts:[{l:'Every Vogue title',go:'t2'},{l:'Vogue US only',go:'t2'}]},
+  t2:{looked:['Checked the escalation rule','Counted who this would affect'],
+   say:'This keeps the AI picking a seat, but nobody from Vogue gets booked without a person signing off.',
+   edits:[{tag:'chg',step:'Assign show and seat',
+    body:`Always ask a person for <span class="was">Tier 1 guests</span> \u2192 <code>Tier 1 guests, or anyone from Vogue</code>`}],
+   affect:'Changes both views. About 14 guests across the week. Takes effect on the next run.',
+   apply:()=>{const a=byId('assign');a.fields[1].opts.push('Tier 1 guests, or anyone from Vogue');
+    a.fields[1].v='Tier 1 guests, or anyone from Vogue'}}},
+
+ text:{
+  starter:'Text the guest instead of emailing',
+  match:/text|sms|message the guest|instead of email/i,
+  t1:{looked:['Read the Launchmetrics profile schema','Checked what Email the guest sends'],
+   say:`The profiles coming from Launchmetrics carry email, tier, affiliation and access notes, but no phone number. So there is nothing to text yet.
+   <span class="q">How do you want to get there?</span>`,
+   opts:[{l:'Pull phone numbers from Launchmetrics too',go:'ask'},
+    {l:'Text where we have a number, email everyone else',go:'ask'},
+    {l:'Leave it as email',go:'drop'}]},
+  ask:{looked:['Drafted a request against the exact step'],
+   say:'Adding the phone field to <b>Pull guest profiles</b> changes what the merge reads. Here is the change.',
+   edits:[],affect:'Nothing changes until she adds the field. Your workflow is untouched.',
+   applyLabel:'Add the field',apply:()=>{}},
+  drop:{looked:[],say:'Left as it is.',edits:[],affect:'',applyLabel:null,apply:()=>{}}},
+
+ diet:{
+  starter:'Add a step to check dietary needs before the show',
+  match:/dietar|allerg|food|access|check.*before/i,
+  t1:{looked:['Read the profile fields','Checked this run\u2019s 12 guests'],
+   say:`Profiles carry dietary and access notes. Two of this run\u2019s twelve guests have one.
+   <span class="q">Should the step run for everyone, or only guests with a note?</span>
+   `,
+   opts:[{l:'Only guests who have a note',go:'t2'},{l:'Every guest',go:'t2'}]},
+  t2:{looked:['Placed the step after Create hospitality task'],
+   say:'It sits after the hospitality task so the note lands on something that already exists.',
+   edits:[{tag:'add',step:'Flag dietary and access needs',
+    body:`Runs once per guest, after <code>Create hospitality task</code>, only when the profile has a note. Posts the guest, the show and the note to <code>#hospitality</code>.`}],
+   affect:'Adds one step to the Ops view. Two of this run\u2019s guests would have triggered it.',
+   apply:()=>{const s={id:'diet_'+Date.now(),name:'Flag dietary and access needs',scope:'record',kind:'action',
+    system:'Slack',mode:'write',sub:'#hospitality \u00b7 only when there is a note',
+    does:'Tells hospitality about a guest\u2019s dietary or access needs, and skips everyone else.',
+    conn:{id:'slack',name:'Slack',acct:'fashionweek-ops \u00b7 connected'},
+    fields:[{k:'Channel',v:'#hospitality',ed:'text'},{k:'Only run when',v:'The guest has a note',ed:'select',opts:['The guest has a note','Always']}],
+    cols:['guest','note'],rows:[['Mira Osei','no shellfish'],['Sana Idris','step-free access']]};
+    STEPS.splice(STEPS.findIndex(x=>x.id==='email'),0,s)}}}
+};
+
+let flowKey=null, uid=0;
+const clog=()=>document.getElementById('clog');
+function paintChips(){
+ document.getElementById('starters').innerHTML=Object.keys(FLOWS)
+  .map(k=>`<button onclick="startFlow('${k}')">${FLOWS[k].starter}</button>`).join('');
+}
+function youSay(t){const d=document.createElement('div');d.className='msg you';
+ d.innerHTML=`<span>${t}</span>`;clog().appendChild(d);scrollChat()}
+function scrollChat(){const c=clog();c.scrollTop=c.scrollHeight}
+
+function botTurn(key,turn){
+ const t=FLOWS[key][turn];if(!t)return;
+ const id='w'+(++uid);
+ const d=document.createElement('div');d.className='msg bot';
+ const secs=t.edits?'3':'2';
+ d.innerHTML=(t.looked&&t.looked.length?
+   `<div class="worked" onclick="this.classList.toggle('open');document.getElementById('${id}').classList.toggle('on')">
+     <span class="cv">\u203a</span> Analysed for ${secs}s</div>
+    <div class="looked" id="${id}">${t.looked.map(l=>`<div>${l}</div>`).join('')}</div>`:'')+
+  `<div class="say">${t.say}</div>`+
+  (t.opts?`<div class="opts2">${t.opts.map((o,i)=>
+    `<button onclick="pickOpt('${key}','${o.go}','${o.l.replace(/'/g,"\\'")}')">${o.l}</button>`).join('')}</div>`:'')+
+  (t.edits&&t.edits.length?`<div class="proposal">`+
+    t.edits.map(e=>`<div class="edit"><div class="eh"><span class="tag ${e.tag}">${e.tag==='add'?'add':e.tag==='chg'?'change':'remove'}</span>
+      <span class="en">${e.step}</span></div><div class="eb">${e.body}</div></div>`).join('')+
+    `<div class="affect">${t.affect}</div>
+     <div class="proact"><button onclick="this.closest('.msg').querySelector('.proact').innerHTML='<span style=\\'font-size:12px;color:var(--ink3)\\'>Discarded</span>'">Discard</button>
+     <button class="prim" onclick="applyTurn('${key}','${turn}',this)">${t.applyLabel||('Apply '+t.edits.length+' change'+(t.edits.length>1?'s':''))}</button></div></div>`
+   :(t.applyLabel?`<div class="proposal"><div class="affect">${t.affect}</div>
+     <div class="proact"><button onclick="this.closest('.proact').innerHTML='<span style=\\'font-size:12px;color:var(--ink3)\\'>Not sent</span>'">Not now</button>
+     <button class="prim" onclick="applyTurn('${key}','${turn}',this)">${t.applyLabel}</button></div></div>`:''));
+ clog().appendChild(d);scrollChat();
+}
+function startFlow(key,typed){
+ flowKey=key;youSay(typed||FLOWS[key].starter);
+ document.getElementById('askIn').value='';
+ setTimeout(()=>botTurn(key,'t1'),120);
+}
+function pickOpt(key,go,label){
+ youSay(label);setTimeout(()=>botTurn(key,go),120);
+}
+function applyTurn(key,turn,btn){
+ const t=FLOWS[key][turn];
+ t.apply();bump();render();if(selected)openPanel(selected);
+ btn.closest('.proact').innerHTML='<span style="font-size:12px;color:var(--ok)">Applied to the workflow</span>';
+ scrollChat();
+ toast(t.applyLabel?'Sent, with a link to the step':'Applied. Both views updated.');
+}
+function askFromInput(){
+ const v=document.getElementById('askIn').value.trim();if(!v)return;
+ const k=Object.keys(FLOWS).find(k=>FLOWS[k].match.test(v));
+ if(!k){youSay(v);document.getElementById('askIn').value='';
+  const d=document.createElement('div');d.className='msg bot';
+  d.innerHTML=`<div class="say">This prototype only demos a few changes. Try one of the suggestions below.</div>`;
+  clog().appendChild(d);scrollChat();return}
+ startFlow(k,v);
+}
+function newChat(){clog().innerHTML='';flowKey=null;
+ const d=document.createElement('div');d.className='msg bot';
+ d.innerHTML=`<div class="say">What do you want to change?</div>`;
+ clog().appendChild(d)}
+function openChat(){document.getElementById('chat').classList.add('on');
+ document.body.classList.add('chatopen');if(!clog().children.length)newChat();
+ document.getElementById('chatOpen').setAttribute('aria-expanded','true');
+ document.querySelector('.fab .lbl').textContent='Hide Ana';
+ setTimeout(()=>{document.getElementById('askIn').focus();drawWires()},240)}
+function closeChat(){document.getElementById('chat').classList.remove('on');
+ document.body.classList.remove('chatopen');
+ document.getElementById('chatOpen').setAttribute('aria-expanded','false');
+ document.querySelector('.fab .lbl').textContent='Ask Ana';
+ setTimeout(drawWires,240)}
+function toggleChat(){document.body.classList.contains('chatopen')?closeChat():openChat()}
+document.getElementById('chatOpen').onclick=toggleChat;
+document.addEventListener('keydown',e=>{
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();toggleChat()}
+ if(e.key==='Escape'&&document.body.classList.contains('chatopen')&&document.activeElement.id!=='askIn')closeChat();
+});
+document.getElementById('chatX').onclick=closeChat;
+document.getElementById('chatNew').onclick=newChat;
+document.getElementById('askGo').onclick=askFromInput;
+document.getElementById('askIn').addEventListener('keydown',e=>{if(e.key==='Enter')askFromInput()});
+
+paintChips();
+/* ---------- tooltips ----------
+   One element, delegated. Anything with data-tip gets it, so the pattern
+   is consistent everywhere instead of being rebuilt per component. */
+const tipEl=document.getElementById('tip');
+let tipTimer=null;
+function showTip(el){
+  const t=el.getAttribute('data-tip');if(!t)return;
+  tipEl.innerHTML=t;tipEl.classList.add('on');
+  const r=el.getBoundingClientRect();const b=tipEl.getBoundingClientRect();
+  let x=r.left+r.width/2-b.width/2;
+  let y=r.top-b.height-8;
+  if(y<64){y=r.bottom+8}
+  x=Math.max(8,Math.min(x,innerWidth-b.width-8));
+  tipEl.style.left=x+'px';tipEl.style.top=y+'px';
+}
+function hideTip(){tipEl.classList.remove('on');clearTimeout(tipTimer)}
+document.addEventListener('mouseover',e=>{
+  const el=e.target.closest('[data-tip]');
+  if(!el){hideTip();return}
+  clearTimeout(tipTimer);tipTimer=setTimeout(()=>showTip(el),180);
+});
+document.addEventListener('mouseout',e=>{if(e.target.closest('[data-tip]'))hideTip()});
+document.addEventListener('focusin',e=>{const el=e.target.closest('[data-tip]');if(el)showTip(el)});
+document.addEventListener('focusout',hideTip);
+document.addEventListener('scroll',hideTip,true);
+window.addEventListener('keydown',e=>{if(e.key==='Escape')hideTip()});
+
+sync();render();
+</script>
+</body>
+</html>
